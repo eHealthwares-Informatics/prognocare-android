@@ -30,6 +30,12 @@ data class IncomingMessageNotification(
     val createdAt: String?,
 )
 
+/** Emitted when the conversation engine ends a conversation (e.g. questionnaire completed). */
+data class ConversationEnded(
+    val conversationId: String,
+    val status: String?,
+)
+
 /**
  * Data layer for the Conversation Engine: inbox + messages REST calls, outbound
  * send via /webhooks/web, and realtime message/inbox updates via the socket.
@@ -55,6 +61,13 @@ class ChatRepository @Inject constructor(
     private val _newMessage = MutableSharedFlow<IncomingMessageNotification>(extraBufferCapacity = 8)
     val newMessage: SharedFlow<IncomingMessageNotification> = _newMessage.asSharedFlow()
 
+    private val _conversationEnded = MutableSharedFlow<ConversationEnded>(extraBufferCapacity = 8)
+    val conversationEnded: SharedFlow<ConversationEnded> = _conversationEnded.asSharedFlow()
+
+    /** Every realtime message event, regardless of direction — screens use it to follow a new conversation. */
+    private val _messageArrived = MutableSharedFlow<ExchangeMessage>(extraBufferCapacity = 16)
+    val messageArrived: SharedFlow<ExchangeMessage> = _messageArrived.asSharedFlow()
+
     val chatApi: StateFlow<com.ehealthinformatics.prognocare.data.remote.api.ChatApi> = chatClient.chatApi
     val chatSocket: ChatSocket = socket
 
@@ -64,6 +77,7 @@ class ChatRepository @Inject constructor(
             onInboxUpdated = {
                 scope.launch { refreshInbox(loadOnFailure = true) }
             },
+            onConversationEnded = { raw -> handleConversationEnded(raw) },
         )
     }
 
@@ -148,6 +162,7 @@ class ChatRepository @Inject constructor(
                         put(convId, existing + message)
                     }
                 }
+                _messageArrived.tryEmit(message)
 
                 val senderPhone = senderPhone()
                 val selfSent = message.senderId != null && message.senderId == senderPhone ||
@@ -165,6 +180,31 @@ class ChatRepository @Inject constructor(
 
                 refreshInbox(loadOnFailure = true)
             }
+        }
+    }
+
+    /**
+     * The engine ended a conversation: drop its cached transcript so a stale
+     * thread is never shown, notify open screens to reset, and refresh the
+     * inbox (the next inbound message starts a brand-new conversation).
+     */
+    private fun handleConversationEnded(raw: JSONObject) {
+        scope.launch {
+            val convId = raw.optString("conversationId")
+            if (convId.isEmpty()) return@launch
+            if (_messagesByConversation.value.containsKey(convId)) {
+                _messagesByConversation.value = buildMap {
+                    putAll(_messagesByConversation.value)
+                    remove(convId)
+                }
+            }
+            _conversationEnded.tryEmit(
+                ConversationEnded(
+                    conversationId = convId,
+                    status = raw.optString("status").ifEmpty { null },
+                ),
+            )
+            refreshInbox(loadOnFailure = true)
         }
     }
 }

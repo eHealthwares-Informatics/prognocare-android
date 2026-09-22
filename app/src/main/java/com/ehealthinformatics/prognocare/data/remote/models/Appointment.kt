@@ -86,6 +86,14 @@ data class CancelAppointmentDto(
     val reason: String = "",
 )
 
+/** Backend check-in returns the transitioned appointment plus the created visit. */
+@Serializable
+data class CheckInResponse(
+    val appointment: Appointment = Appointment(),
+    val visitId: String? = null,
+    val visit: Visit? = null,
+)
+
 enum class AppointmentType {
     CHECKUP, FOLLOW_UP, CONSULTATION, PROCEDURE, EMERGENCY, SURGERY, OTHER,
 }

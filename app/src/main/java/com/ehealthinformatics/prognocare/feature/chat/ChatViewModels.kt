@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.remote.models.ConversationInboxItem
 import com.ehealthinformatics.prognocare.data.remote.models.ExchangeMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -41,6 +42,12 @@ class ChatViewModel @Inject constructor(
     val messagesByConversation: StateFlow<Map<String, List<ExchangeMessage>>> =
         repository.messagesByConversation
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Fired when the engine ends the open conversation — the screen resets for a fresh chat. */
+    val conversationEnded: SharedFlow<ConversationEnded> = repository.conversationEnded
+
+    /** Every realtime message event — lets the screen follow a newly-started conversation. */
+    val messageArrived: SharedFlow<ExchangeMessage> = repository.messageArrived
 
     fun messagesFor(conversationId: String): List<ExchangeMessage> =
         messagesByConversation.value[conversationId].orEmpty()

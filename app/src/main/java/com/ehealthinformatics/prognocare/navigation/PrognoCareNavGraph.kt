@@ -67,6 +67,7 @@ import com.ehealthinformatics.prognocare.feature.dashboard.therapist.TherapistPa
 import com.ehealthinformatics.prognocare.feature.dashboard.finance.FinanceDashboardScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.finance.FinanceBillListScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.support.SupportDashboardScreen
+import com.ehealthinformatics.prognocare.feature.checkin.CheckInQueueScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.support.SupportCheckInScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.support.SupportRequestListScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.technician.TechnicianDashboardScreen
@@ -521,6 +522,7 @@ fun PrognoCareNavGraph(
             composable(PatientRoutes.APPOINTMENTS) {
                 PatientAppointmentScreen(
                     onBack = { navController.popBackStack() },
+                    onBook = { navController.navigate(PatientRoutes.BOOKING) },
                 )
             }
 
@@ -686,7 +688,10 @@ fun PrognoCareNavGraph(
             }
 
             composable(AdminRoutes.CHECKIN) {
-                // Check-in screen
+                CheckInQueueScreen(
+                    title = "Check-In",
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(AdminRoutes.STAFF) {

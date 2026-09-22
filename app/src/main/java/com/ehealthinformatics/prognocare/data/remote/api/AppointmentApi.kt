@@ -3,6 +3,7 @@ package com.ehealthinformatics.prognocare.data.remote.api
 import com.ehealthinformatics.prognocare.data.remote.models.Appointment
 import com.ehealthinformatics.prognocare.data.remote.models.CancelAppointmentDto
 import com.ehealthinformatics.prognocare.data.remote.models.CheckInAppointmentDto
+import com.ehealthinformatics.prognocare.data.remote.models.CheckInResponse
 import com.ehealthinformatics.prognocare.data.remote.models.CreateAppointmentDto
 import com.ehealthinformatics.prognocare.data.remote.models.PaginatedResponse
 import com.ehealthinformatics.prognocare.data.remote.models.UpdateAppointmentDto
@@ -24,6 +25,10 @@ interface AppointmentApi {
         @Query("date") date: String? = null,
         @Query("status") status: String? = null,
         @Query("providerId") providerId: String? = null,
+        @Query("patientId") patientId: String? = null,
+        @Query("search") search: String? = null,
+        @Query("sortBy") sortBy: String? = null,
+        @Query("sortOrder") sortOrder: String? = null,
     ): Response<PaginatedResponse<Appointment>>
 
     @POST("api/appointments")
@@ -45,7 +50,7 @@ interface AppointmentApi {
     suspend fun checkIn(
         @Path("id") id: String,
         @Body dto: CheckInAppointmentDto = CheckInAppointmentDto(),
-    ): Response<Appointment>
+    ): Response<CheckInResponse>
 
     @POST("api/appointments/{id}/cancel")
     suspend fun cancel(

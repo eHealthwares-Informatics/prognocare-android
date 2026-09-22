@@ -25,16 +25,24 @@ class ChatSocket @Inject constructor(
     private var socket: Socket? = null
 
     @Synchronized
-    fun connect(onMessage: (JSONObject) -> Unit, onInboxUpdated: (JSONObject) -> Unit) {
+    fun connect(
+        onMessage: (JSONObject) -> Unit,
+        onInboxUpdated: (JSONObject) -> Unit,
+        onConversationEnded: (JSONObject) -> Unit,
+    ) {
         val existing = socket
         if (existing != null && existing.connected()) {
             existing.off("conversation.message.created")
             existing.off("conversation.updated")
+            existing.off("conversation.ended")
             existing.on("conversation.message.created") { args ->
                 if (args.isNotEmpty()) onMessage(args[0] as? JSONObject ?: JSONObject())
             }
             existing.on("conversation.updated") { args ->
                 if (args.isNotEmpty()) onInboxUpdated(args[0] as? JSONObject ?: JSONObject())
+            }
+            existing.on("conversation.ended") { args ->
+                if (args.isNotEmpty()) onConversationEnded(args[0] as? JSONObject ?: JSONObject())
             }
             return
         }
@@ -59,6 +67,9 @@ class ChatSocket @Inject constructor(
         }
         s.on("conversation.updated") { args ->
             if (args.isNotEmpty()) onInboxUpdated(args[0] as? JSONObject ?: JSONObject())
+        }
+        s.on("conversation.ended") { args ->
+            if (args.isNotEmpty()) onConversationEnded(args[0] as? JSONObject ?: JSONObject())
         }
         s.connect()
     }

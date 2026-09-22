@@ -61,18 +61,41 @@ fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     var messageText by remember { mutableStateOf("") }
+    // The conversation being displayed. It starts as the navigated-to id and
+    // may switch when the engine ends this conversation and starts a fresh one
+    // in response to the user's next message.
+    var activeId by remember { mutableStateOf(conversationId) }
+    var conversationEnded by remember { mutableStateOf(false) }
     val messagesMap by viewModel.messagesByConversation.collectAsStateWithLifecycle()
-    val messages = remember(messagesMap, conversationId) {
-        messagesMap[conversationId].orEmpty()
+    val messages = remember(messagesMap, activeId) {
+        messagesMap[activeId].orEmpty()
     }
 
-    LaunchedEffect(conversationId) {
-        viewModel.loadMessages(conversationId)
+    LaunchedEffect(activeId) {
+        viewModel.loadMessages(activeId)
     }
 
-    DisposableEffect(conversationId) {
+    // Reset the thread when the engine ends the open conversation, and follow
+    // the new conversation the server starts on the user's next message.
+    LaunchedEffect(Unit) {
+        viewModel.conversationEnded.collect { event ->
+            if (event.conversationId == activeId) {
+                conversationEnded = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.messageArrived.collect { event ->
+            if (conversationEnded && event.conversationId != activeId) {
+                activeId = event.conversationId
+                conversationEnded = false
+            }
+        }
+    }
+
+    DisposableEffect(activeId) {
         onDispose {
-            viewModel.onClearedConversation(conversationId)
+            viewModel.onClearedConversation(activeId)
         }
     }
 
@@ -91,11 +114,10 @@ fun ChatScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = conversation?.status ?: "ACTIVE",
+                            text = if (conversationEnded) "ENDED" else conversation?.status ?: "ACTIVE",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                        )                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -136,10 +158,22 @@ fun ChatScreen(
                     ChatBubble(
                         message = message,
                         onOptionSelect = { value ->
-                            viewModel.sendMessage(conversationId, value)
+                            viewModel.sendMessage(activeId, value)
                         },
                     )
                 }
+            }
+
+            if (conversationEnded) {
+                Text(
+                    text = "Conversation ended — send a message to start a new one.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = Spacing.base, vertical = Spacing.sm),
+                )
             }
 
             // Input
@@ -177,7 +211,7 @@ fun ChatScreen(
                 IconButton(
                     onClick = {
                         if (messageText.isNotBlank()) {
-                            viewModel.sendMessage(conversationId, messageText.trim())
+                            viewModel.sendMessage(activeId, messageText.trim())
                             messageText = ""
                         }
                     },
