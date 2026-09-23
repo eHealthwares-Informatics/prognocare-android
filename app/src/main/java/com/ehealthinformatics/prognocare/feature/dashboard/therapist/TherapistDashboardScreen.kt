@@ -343,7 +343,7 @@ fun TherapistDashboardScreen(
                 SessionCard(
                     session = session,
                     onClick = { onNavigateToPatientDetail(session.patientMrn) },
-                    onComplete = { viewModel.completeSession(session.id) },
+                    onComplete = { /* session completion not backend-backed yet */ },
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -356,7 +356,11 @@ fun TherapistDashboardScreen(
                         actionText = "View All",
                         onActionClick = { /* view all plans */ },
                     )
-                    Spacer(modifier = Modifier.height(Spacing.md))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                        text = "Not available — therapy plans module is not in the backend yet",
+                        modifier = Modifier.padding(bottom = Spacing.sm),
+                    )
                 }
             }
 
@@ -376,7 +380,11 @@ fun TherapistDashboardScreen(
                         actionText = "View All",
                         onActionClick = { /* view assessments */ },
                     )
-                    Spacer(modifier = Modifier.height(Spacing.md))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                        text = "Not available — assessments module is not in the backend yet",
+                        modifier = Modifier.padding(bottom = Spacing.sm),
+                    )
                 }
             }
 

@@ -300,7 +300,11 @@ fun SpecialistDashboardScreen(
                         actionText = "View All",
                         onActionClick = onNavigateToReferrals,
                     )
-                    Spacer(modifier = Modifier.height(Spacing.md))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                        text = "Not available — referrals module is not in the backend yet",
+                        modifier = Modifier.padding(bottom = Spacing.sm),
+                    )
                 }
             }
 
@@ -308,8 +312,8 @@ fun SpecialistDashboardScreen(
                 ReferralCard(
                     referral = referral,
                     onClick = { onNavigateToPatientDetail(referral.patientMrn) },
-                    onAccept = { viewModel.acceptReferral(referral.id) },
-                    onDecline = { viewModel.declineReferral(referral.id) },
+                    onAccept = { /* referrals not backend-backed yet */ },
+                    onDecline = { /* referrals not backend-backed yet */ },
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }

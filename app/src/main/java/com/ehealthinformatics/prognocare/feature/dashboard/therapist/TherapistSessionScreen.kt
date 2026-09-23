@@ -151,7 +151,7 @@ fun TherapistSessionScreen(
                         SessionDetailCard(
                             session = session,
                             onClick = { onPatientClick(session.patientMrn) },
-                            onComplete = { viewModel.completeSession(session.id) },
+                            onComplete = { { /* session completion not backend-backed yet */ } },
                         )
                     }
                     item { Spacer(modifier = Modifier.height(Spacing.xxxl)) }

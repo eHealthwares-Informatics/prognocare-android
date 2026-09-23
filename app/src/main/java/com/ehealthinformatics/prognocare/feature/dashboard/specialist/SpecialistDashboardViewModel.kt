@@ -1,14 +1,29 @@
 package com.ehealthinformatics.prognocare.feature.dashboard.specialist
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ehealthinformatics.prognocare.data.auth.SessionStore
+import com.ehealthinformatics.prognocare.feature.appointments.AppointmentQuery
+import com.ehealthinformatics.prognocare.feature.appointments.AppointmentsRepository
+import com.ehealthinformatics.prognocare.feature.records.EmrRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
-class SpecialistDashboardViewModel @Inject constructor() : ViewModel() {
+class SpecialistDashboardViewModel @Inject constructor(
+    private val appointmentsRepository: AppointmentsRepository,
+    private val emrRepository: EmrRepository,
+    @ApplicationContext private val context: Context,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(SpecialistDashboardState())
     val state: StateFlow<SpecialistDashboardState> = _state.asStateFlow()
@@ -17,88 +32,61 @@ class SpecialistDashboardViewModel @Inject constructor() : ViewModel() {
         loadDashboardData()
     }
 
+    fun retry() = loadDashboardData()
+
     private fun loadDashboardData() {
-        _state.value = SpecialistDashboardState(
-            greeting = "Good morning",
-            specialistName = "Dr. Fatima Bello",
-            specialty = "Endocrinology",
-            todayDate = "Tuesday, Aug 18",
-            pendingReferrals = 8,
-            activePatients = 45,
-            completedReviews = 12,
-            urgentCases = 3,
-            recentReferrals = listOf(
-                SpecialistReferral(
-                    "1", "Chidi Okonkwo", 45, "MRN-00142",
-                    "Dr. Adebayo", "Persistent hyperglycemia despite metformin adjustment",
-                    ReferralPriority.HIGH, ReferralStatus.PENDING, "Aug 18, 2026",
-                    "Endocrinology", "Patient needs insulin therapy evaluation",
-                ),
-                SpecialistReferral(
-                    "2", "Funke Adeleke", 38, "MRN-00189",
-                    "Dr. Ibrahim", "Thyroid nodule evaluation - TSH elevated",
-                    ReferralPriority.NORMAL, ReferralStatus.IN_REVIEW, "Aug 17, 2026",
-                    "Endocrinology", "Ultrasound results attached",
-                ),
-                SpecialistReferral(
-                    "3", "Emeka Nwosu", 52, "MRN-00201",
-                    "Dr. Adebayo", "Suspected Cushing's syndrome - overnight dexamethasone suppression test",
-                    ReferralPriority.URGENT, ReferralStatus.PENDING, "Aug 18, 2026",
-                    "Endocrinology", "Rapid weight gain and moon facies observed",
-                ),
-                SpecialistReferral(
-                    "4", "Amina Bello", 29, "MRN-00156",
-                    "Dr. Fatima", "PCOS management - irregular cycles and hirsutism",
-                    ReferralPriority.NORMAL, ReferralStatus.ACCEPTED, "Aug 16, 2026",
-                    "Endocrinology", "Start treatment plan",
-                ),
-                SpecialistReferral(
-                    "5", "Yusuf Abdullahi", 61, "MRN-00234",
-                    "Dr. Ibrahim", "Type 1 diabetes - difficulty controlling glucose",
-                    ReferralPriority.HIGH, ReferralStatus.COMPLETED, "Aug 14, 2026",
-                    "Endocrinology", "Insulin pump therapy initiated",
-                ),
-            ),
-            upcomingConsultations = listOf(
-                SpecialistConsultation(
-                    "1", "Chidi Okonkwo", "MRN-00142", "Follow-up",
-                    "Aug 20, 2026", "10:00 AM", "Endocrinology Clinic, Room 2",
-                    "SCHEDULED", "Insulin therapy review", true,
-                ),
-                SpecialistConsultation(
-                    "2", "Funke Adeleke", "MRN-00189", "Consultation",
-                    "Aug 21, 2026", "02:30 PM", "Endocrinology Clinic, Room 2",
-                    "SCHEDULED", "Thyroid nodule biopsy results",
-                ),
-                SpecialistConsultation(
-                    "3", "Emeka Nwosu", "MRN-00201", "Urgent Review",
-                    "Aug 19, 2026", "09:00 AM", "Endocrinology Clinic, Room 1",
-                    "SCHEDULED", "Cushing's evaluation", true,
-                ),
-            ),
-            specialtyStats = SpecialtyStats(),
-            isLoading = false,
-        )
-    }
+        viewModelScope.launch {
+            try {
+                val today = LocalDate.now()
+                val staffId = SessionStore.getStaffId(context)
 
-    fun acceptReferral(referralId: String) {
-        val current = _state.value
-        _state.value = current.copy(
-            recentReferrals = current.recentReferrals.map {
-                if (it.id == referralId) it.copy(status = ReferralStatus.ACCEPTED) else it
-            },
-            pendingReferrals = (current.pendingReferrals - 1).coerceAtLeast(0),
-            activePatients = current.activePatients + 1,
-        )
-    }
+                val myAppointments = appointmentsRepository.list(
+                    AppointmentQuery(date = today.toString(), providerId = staffId, limit = 50),
+                )
+                val myEncounters = runCatching {
+                    emrRepository.encounters(limit = 100).filter { it.providerId == staffId }
+                }.getOrDefault(emptyList())
+                val summary = runCatching { emrRepository.dashboard(today.toString()) }.getOrNull()
 
-    fun declineReferral(referralId: String) {
-        val current = _state.value
-        _state.value = current.copy(
-            recentReferrals = current.recentReferrals.map {
-                if (it.id == referralId) it.copy(status = ReferralStatus.DECLINED) else it
-            },
-            pendingReferrals = (current.pendingReferrals - 1).coerceAtLeast(0),
-        )
+                val consultations = myAppointments.map { apt ->
+                    SpecialistConsultation(
+                        id = apt.id,
+                        patientName = apt.patientName,
+                        patientMrn = apt.patientId,
+                        type = apt.typeDisplay,
+                        date = apt.date,
+                        time = apt.startTime,
+                        location = apt.scheduleLocation ?: "—",
+                        status = apt.status,
+                        reason = apt.reason,
+                        isUrgent = apt.isUrgent,
+                    )
+                }
+
+                _state.value = SpecialistDashboardState(
+                    greeting = when (LocalDateTime.now().hour) {
+                        in 5..11 -> "Good morning"
+                        in 12..16 -> "Good afternoon"
+                        else -> "Good evening"
+                    },
+                    specialistName = SessionStore.getStaffName(context) ?: "Specialist",
+                    specialty = "Specialist Clinic",
+                    todayDate = today.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
+                    // Referrals have no backend module yet — keep zeroed with demo tags in UI.
+                    pendingReferrals = 0,
+                    activePatients = summary?.metrics?.activeVisits ?: myEncounters.size,
+                    completedReviews = summary?.metrics?.completed ?: 0,
+                    urgentCases = myAppointments.count {
+                        it.isUrgent && it.status !in listOf("COMPLETED", "CANCELLED", "NO_SHOW")
+                    },
+                    recentReferrals = emptyList(),
+                    upcomingConsultations = consultations,
+                    specialtyStats = SpecialtyStats(),
+                    isLoading = false,
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Failed to load")
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.ehealthinformatics.prognocare.feature.dashboard.doctor
+package com.ehealthinformatics.prognocare.feature.shared
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,40 +28,34 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
-import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
-import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.Patient
+import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
+import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
+import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class DoctorPatientListViewModel @Inject constructor(
+class PatientSearchViewModel @Inject constructor(
     private val retrofitClient: RetrofitClient,
 ) : ViewModel() {
 
@@ -80,8 +73,8 @@ class DoctorPatientListViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            @OptIn(FlowPreview::class)
-            _search.debounce(300).collect { query -> fetch(query) }
+            @OptIn(kotlinx.coroutines.FlowPreview::class)
+            _search.debounce(300).collect { fetch(it) }
         }
     }
 
@@ -115,30 +108,17 @@ class DoctorPatientListViewModel @Inject constructor(
     }
 }
 
-private data class PatientItem(
-    val id: String,
-    val name: String,
-    val mrn: String,
-    val age: Int,
-    val gender: String,
-    val lastDiagnosis: String,
-)
-
-private fun Patient.toItem(): PatientItem = PatientItem(
-    id = id,
-    name = displayName,
-    mrn = patientId,
-    age = ageYears,
-    gender = gender?.take(1)?.uppercase() ?: "",
-    lastDiagnosis = bloodGroup ?: "",
-)
-
+/**
+ * Real patient directory search shared by roles that only need lookup
+ * (Finance for billing context, Admin/Support for registration desk).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DoctorPatientListScreen(
+fun PatientSearchScreen(
+    title: String = "Patients",
     onBack: () -> Unit,
-    onPatientClick: (String) -> Unit,
-    viewModel: DoctorPatientListViewModel = hiltViewModel(),
+    onPatientClick: ((Patient) -> Unit)? = null,
+    viewModel: PatientSearchViewModel = hiltViewModel(),
 ) {
     val searchQuery by viewModel.search.collectAsStateWithLifecycle()
     val patients by viewModel.patients.collectAsStateWithLifecycle()
@@ -148,13 +128,7 @@ fun DoctorPatientListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Patients",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -177,13 +151,9 @@ fun DoctorPatientListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                placeholder = { Text("Search by name or MRN…") },
+                placeholder = { Text("Search by name, MRN, or phone…") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
-                shape = RoundedCornerShape(Spacing.md),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                ),
             )
 
             when {
@@ -191,9 +161,7 @@ fun DoctorPatientListScreen(
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    ) { CircularProgressIndicator() }
                 }
                 error != null && patients.isEmpty() -> {
                     ErrorState(message = error ?: "Failed to load", onRetry = viewModel::refresh)
@@ -214,75 +182,63 @@ fun DoctorPatientListScreen(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         items(patients, key = { it.id }) { patient ->
-                            PatientListItem(
-                                patient = patient.toItem(),
-                                onClick = { onPatientClick(patient.id) },
-                            )
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (onPatientClick != null) {
+                                            Modifier.clickable { onPatientClick(patient) }
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
+                                shape = RoundedCornerShape(Spacing.base),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(Spacing.base),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = patient.initials.ifBlank { "?" },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(Spacing.md))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = patient.displayName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                        Text(
+                                            text = listOfNotNull(
+                                                patient.patientId,
+                                                patient.phone,
+                                                patient.gender,
+                                            ).joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PatientListItem(
-    patient: PatientItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(Spacing.base),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.base),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = patient.name.take(2),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            Spacer(modifier = Modifier.width(Spacing.md))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = patient.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = "${patient.mrn} · ${patient.age}${patient.gender}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (patient.lastDiagnosis.isNotBlank()) {
-                Text(
-                    text = patient.lastDiagnosis,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                )
             }
         }
     }

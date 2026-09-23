@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,14 +24,13 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,11 +44,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip
+import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
+import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 import com.ehealthinformatics.prognocare.designsystem.theme.Tertiary
+import com.ehealthinformatics.prognocare.feature.requests.RequestsListViewModel
 
 private data class MedicationItem(
     val id: String,
@@ -64,31 +67,40 @@ private data class MedicationItem(
     val notes: String = "",
 )
 
-private val sampleMedications = listOf(
-    MedicationItem("1", "Chidi Okonkwo", "Metformin", "500mg", "Oral", "Twice daily", "09:00 AM", "DUE"),
-    MedicationItem("2", "Chidi Okonkwo", "Lisinopril", "10mg", "Oral", "Once daily", "09:00 AM", "DUE"),
-    MedicationItem("3", "Amina Bello", "Amoxicillin", "250mg", "Oral", "Three times daily", "08:00 AM", "ADMINISTERED"),
-    MedicationItem("4", "Emeka Nwosu", "Paracetamol", "500mg", "Oral", "As needed", "10:30 AM", "DUE"),
-    MedicationItem("5", "Fatima Yusuf", "Omeprazole", "20mg", "Oral", "Once daily", "08:00 AM", "ADMINISTERED"),
-    MedicationItem("6", "Tunde Adeyemi", "Morphine", "5mg", "IV", "Every 4 hours", "11:00 AM", "DUE"),
-    MedicationItem("7", "Ngozi Okafor", "Iron Supplement", "325mg", "Oral", "Once daily", "12:00 PM", "DUE"),
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationAdministrationScreen(
     onBack: () -> Unit,
+    viewModel: RequestsListViewModel = hiltViewModel(key = "med-admin"),
 ) {
     var selectedFilter by remember { mutableStateOf("All") }
     var showAdminDialog by remember { mutableStateOf<MedicationItem?>(null) }
-    val filters = listOf("All", "Due", "Administered", "Skipped")
+    val filters = listOf("All", "Due", "Administered")
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    val filteredMeds = remember(selectedFilter) {
-        when (selectedFilter) {
-            "Due" -> sampleMedications.filter { it.status == "DUE" }
-            "Administered" -> sampleMedications.filter { it.status == "ADMINISTERED" }
-            else -> sampleMedications
-        }
+    // Map open PRESCRIPTION requests into the medication list.
+    val medications = state.requests.map { request ->
+        val first = request.items.firstOrNull()
+        MedicationItem(
+            id = request.id,
+            patientName = request.patientName,
+            medicationName = first?.name ?: "Medication",
+            dosage = listOfNotNull(first?.dose, first?.doseUnit).joinToString(" ").ifBlank { "—" },
+            route = first?.route ?: "—",
+            frequency = first?.frequency ?: "—",
+            scheduledTime = request.requestedAt?.take(10) ?: "—",
+            status = when (request.status) {
+                "COMPLETED" -> "ADMINISTERED"
+                "IN_PROGRESS" -> "IN_PROGRESS"
+                else -> "DUE"
+            },
+        )
+    }
+
+    val filteredMeds = when (selectedFilter) {
+        "Due" -> medications.filter { it.status == "DUE" }
+        "Administered" -> medications.filter { it.status == "ADMINISTERED" }
+        else -> medications
     }
 
     Scaffold(
@@ -115,6 +127,8 @@ fun MedicationAdministrationScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            DemoDataChip(text = "Live from prescription requests · schedules not available")
+
             // Filter chips
             Row(
                 modifier = Modifier
@@ -134,15 +148,34 @@ fun MedicationAdministrationScreen(
                 }
             }
 
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                items(filteredMeds) { med ->
-                    MedicationCard(
-                        medication = med,
-                        onAdminister = { showAdminDialog = med },
+            when {
+                state.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
+                }
+                state.error != null -> {
+                    ErrorState(message = state.error ?: "Failed to load", onRetry = { viewModel.load("PRESCRIPTION") })
+                }
+                filteredMeds.isEmpty() -> {
+                    EmptyState(
+                        title = "No medications due",
+                        message = "Open prescription requests will appear here.",
                     )
+                }
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        items(filteredMeds, key = { it.id }) { med ->
+                            MedicationCard(
+                                medication = med,
+                                onAdminister = { showAdminDialog = med },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -154,7 +187,7 @@ fun MedicationAdministrationScreen(
                 title = { Text("Confirm Administration") },
                 text = {
                     Column {
-                        Text("Administer ${med.medicationName} ${med.dosage} to ${med.patientName}?")
+                        Text("Mark ${med.medicationName} ${med.dosage} as administered to ${med.patientName}?")
                         Spacer(modifier = Modifier.height(Spacing.sm))
                         Text(
                             text = "Route: ${med.route} · Frequency: ${med.frequency}",
@@ -164,7 +197,10 @@ fun MedicationAdministrationScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showAdminDialog = null }) {
+                    TextButton(onClick = {
+                        showAdminDialog = null
+                        viewModel.onMedicationAdministered(med.id)
+                    }) {
                         Text("Confirm", color = Tertiary)
                     }
                 },
@@ -231,7 +267,7 @@ private fun MedicationCard(
                         modifier = Modifier
                             .clip(RoundedCornerShape(Spacing.xs))
                             .background(statusColor.copy(alpha = 0.1f))
-                            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+                            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     ) {
                         Text(
                             text = medication.status,
@@ -241,14 +277,14 @@ private fun MedicationCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(Spacing.xxs))
+                Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
                     text = "${medication.patientName} · ${medication.dosage} · ${medication.route}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "Scheduled: ${medication.scheduledTime} · ${medication.frequency}",
+                    text = "Requested: ${medication.scheduledTime} · ${medication.frequency}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

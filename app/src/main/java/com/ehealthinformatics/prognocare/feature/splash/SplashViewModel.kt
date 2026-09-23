@@ -56,6 +56,13 @@ class SplashViewModel @Inject constructor(
                 .apply()
         }
 
+        /** The role persisted by [saveAuthState], or null when not signed in. */
+        fun loadRole(context: Context): UserRole? {
+            val ordinal = context.getSharedPreferences("prognocare_auth", Context.MODE_PRIVATE)
+                .getInt("user_role", -1)
+            return UserRole.entries.getOrNull(ordinal)
+        }
+
         fun clearAuthState(context: Context) {
             context.getSharedPreferences("prognocare_auth", Context.MODE_PRIVATE)
                 .edit()

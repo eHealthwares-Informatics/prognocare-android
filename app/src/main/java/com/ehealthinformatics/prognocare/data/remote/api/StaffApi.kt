@@ -22,6 +22,8 @@ interface StaffApi {
         @Query("category") category: String? = null,
         @Query("department") department: String? = null,
         @Query("isActive") isActive: Boolean? = null,
+        @Query("userId") userId: String? = null,
+        @Query("limit") limit: Int = 20,
     ): Response<PaginatedResponse<Staff>>
 
     @POST("api/staff")

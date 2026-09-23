@@ -325,6 +325,10 @@ fun SupportDashboardScreen(
                         actionText = "View All",
                         onActionClick = onNavigateToRequests,
                     )
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                        text = "Not available — tickets module is not in the backend yet",
+                    )
                     Spacer(modifier = Modifier.height(Spacing.sm))
                 }
             }

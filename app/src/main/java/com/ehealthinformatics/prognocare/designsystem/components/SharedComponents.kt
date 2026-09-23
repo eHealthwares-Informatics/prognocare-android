@@ -577,3 +577,45 @@ fun ErrorState(
         }
     }
 }
+
+// ── Not-Available / Demo-Data Badges ──────────────────────────
+
+/**
+ * Small pill shown on features backed by demo data only (no backend module
+ * yet, e.g. referrals, billing ledger, therapy plans).
+ */
+@Composable
+fun NotAvailableBadge(
+    modifier: Modifier = Modifier,
+    label: String = "Not available",
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(Spacing.xs))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Inline caption for screens whose sections run on demo data while the rest
+ * of the screen is live.
+ */
+@Composable
+fun DemoDataChip(
+    modifier: Modifier = Modifier,
+    text: String = "Demo data — backend module not available",
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+    )
+}

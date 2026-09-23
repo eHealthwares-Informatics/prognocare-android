@@ -154,8 +154,8 @@ fun SpecialistReferralScreen(
                         ReferralDetailCard(
                             referral = referral,
                             onClick = { onPatientClick(referral.patientMrn) },
-                            onAccept = { viewModel.acceptReferral(referral.id) },
-                            onDecline = { viewModel.declineReferral(referral.id) },
+                            onAccept = { { /* referrals not backend-backed yet */ } },
+                            onDecline = { { /* referrals not backend-backed yet */ } },
                         )
                     }
                     item { Spacer(modifier = Modifier.height(Spacing.xxxl)) }

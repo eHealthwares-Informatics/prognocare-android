@@ -3,6 +3,7 @@ package com.ehealthinformatics.prognocare.feature.auth
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ehealthinformatics.prognocare.data.auth.SessionStore
 import com.ehealthinformatics.prognocare.data.remote.AuthInterceptor
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.LoginDto
@@ -59,11 +60,29 @@ class LoginViewModel @Inject constructor(
                     return@launch
                 }
 
-                val role = UserRoleMapper.map(meResp.body()!!)
+                val me = meResp.body()!!
+                SessionStore.saveUserId(context, me.id)
+                val role = UserRoleMapper.map(me)
                 SplashViewModel.saveAuthState(context, role)
+                SessionStore.saveRole(context, role)
+
+                // Best-effort: resolve the staff record linked to this identity
+                // user so clinician dashboards can self-scope their queries.
+                resolveStaff(me.id)
+
                 _state.value = LoginState.Success(role)
             } catch (e: Exception) {
                 _state.value = LoginState.Error("Network error: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun resolveStaff(userId: String) {
+        runCatching {
+            val response = retrofitClient.apis.value.staffApi.list(userId = userId, limit = 1)
+            val staff = response.body()?.data?.firstOrNull()
+            if (staff != null) {
+                SessionStore.saveStaff(context, staff.id, staff.displayName)
             }
         }
     }

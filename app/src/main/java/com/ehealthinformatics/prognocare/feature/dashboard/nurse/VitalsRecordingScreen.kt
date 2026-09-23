@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 import com.ehealthinformatics.prognocare.designsystem.theme.Tertiary
 import kotlinx.coroutines.launch
@@ -56,8 +58,11 @@ import kotlinx.coroutines.launch
 fun VitalsRecordingScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
+    viewModel: VitalsRecordingViewModel = hiltViewModel(),
 ) {
     var patientName by remember { mutableStateOf("") }
+    var selectedPatient by remember { mutableStateOf<com.ehealthinformatics.prognocare.data.remote.models.Patient?>(null) }
+    var patientResults by remember { mutableStateOf<List<com.ehealthinformatics.prognocare.data.remote.models.Patient>>(emptyList()) }
     var temperature by remember { mutableStateOf("") }
     var bpSystolic by remember { mutableStateOf("") }
     var bpDiastolic by remember { mutableStateOf("") }
@@ -71,6 +76,7 @@ fun VitalsRecordingScreen(
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val setupState by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -101,16 +107,35 @@ fun VitalsRecordingScreen(
         ) {
             Spacer(modifier = Modifier.height(Spacing.sm))
 
-            // Patient selector
+            // Patient selector — real patient search
             VitalsSection("Patient") {
                 OutlinedTextField(
                     value = patientName,
-                    onValueChange = { patientName = it },
+                    onValueChange = { query ->
+                        patientName = query
+                        selectedPatient = null
+                        scope.launch {
+                            viewModel.searchPatients(query) { results -> patientResults = results }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Search patient by name or MRN") },
                     singleLine = true,
                     shape = RoundedCornerShape(Spacing.md),
                 )
+                if (selectedPatient == null) {
+                    patientResults.take(4).forEach { patient ->
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                selectedPatient = patient
+                                patientResults = emptyList()
+                                patientName = patient.displayName
+                            },
+                        ) {
+                            Text("${patient.displayName} · ${patient.patientId}")
+                        }
+                    }
+                }
             }
 
             // Vital Signs
@@ -212,12 +237,42 @@ fun VitalsRecordingScreen(
 
             Spacer(modifier = Modifier.height(Spacing.xl))
 
-            // Save button
+            // Save button — submits the VITALS documentation form
             Button(
                 onClick = {
+                    val patient = selectedPatient
+                    if (patient == null) {
+                        scope.launch { snackbarHostState.showSnackbar("Select a patient first") }
+                        return@Button
+                    }
+                    val form = setupState.vitalsForm
+                    if (form == null) {
+                        scope.launch { snackbarHostState.showSnackbar("VITALS form not available") }
+                        return@Button
+                    }
                     scope.launch {
-                        snackbarHostState.showSnackbar("Vitals recorded successfully")
-                        onSaved()
+                        val data: Map<String, Any?> = buildMap {
+                            temperature.toDoubleOrNull()?.let { put("temperature", it) }
+                            bpSystolic.toIntOrNull()?.let { put("bp_systolic", it) }
+                            bpDiastolic.toIntOrNull()?.let { put("bp_diastolic", it) }
+                            heartRate.toIntOrNull()?.let { put("heart_rate", it) }
+                            respiratoryRate.toIntOrNull()?.let { put("respiratory_rate", it) }
+                            oxygenSaturation.toIntOrNull()?.let { put("oxygen_saturation", it) }
+                            weight.toDoubleOrNull()?.let { put("weight", it) }
+                            height.toDoubleOrNull()?.let { put("height", it) }
+                            if (notes.isNotBlank()) put("notes", notes)
+                        }
+                        val ok = viewModel.submitVitals(
+                            formId = form.id,
+                            patientId = patient.id,
+                            data = data,
+                        )
+                        if (ok) {
+                            snackbarHostState.showSnackbar("Vitals recorded successfully")
+                            onSaved()
+                        } else {
+                            snackbarHostState.showSnackbar("Could not save vitals — check the form keys or server")
+                        }
                     }
                 },
                 modifier = Modifier

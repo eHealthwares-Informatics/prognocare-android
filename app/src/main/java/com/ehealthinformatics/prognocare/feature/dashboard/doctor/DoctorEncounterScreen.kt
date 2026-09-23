@@ -52,6 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ehealthinformatics.prognocare.designsystem.components.StatusBadge
 import com.ehealthinformatics.prognocare.designsystem.components.StatusType
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
@@ -69,32 +71,65 @@ data class EncounterData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorEncounterScreen(
-    patientId: String,
+    encounterId: String,
     onBack: () -> Unit,
     onAddNote: () -> Unit,
     onAddDiagnosis: () -> Unit,
     onComplete: () -> Unit,
+    viewModel: DoctorEncounterViewModel = hiltViewModel(key = "encounter-$encounterId"),
 ) {
     var currentStep by remember { mutableStateOf(0) }
     val steps = listOf("Vitals", "Notes", "Diagnosis", "Prescription")
 
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(encounterId) {
+        viewModel.bind(encounterId)
+    }
+
     val encounter = EncounterData(
-        patientName = "Adaeze Nwankwo",
-        patientMrn = "MRN-2024-1001",
-        encounterType = "General Consultation",
-        chiefComplaint = "Persistent headache for 3 days, mild fever",
-        vitals = mapOf(
-            "Blood Pressure" to "128/82 mmHg",
-            "Heart Rate" to "78 bpm",
-            "Temperature" to "37.8°C",
-            "Respiratory Rate" to "16/min",
-            "SpO2" to "98%",
-            "Weight" to "68 kg",
-        ),
-        notes = "Patient presents with persistent frontal headache for 3 days. Mild fever reported. No history of hypertension. Last medication was paracetamol 500mg two days ago.",
-        diagnosis = "Tension-type headache with low-grade fever",
-        status = "IN_PROGRESS",
+        patientName = state.patient?.displayName ?: "Unknown patient",
+        patientMrn = state.patient?.patientId ?: "—",
+        encounterType = state.encounter?.typeDisplay ?: "Encounter",
+        chiefComplaint = state.encounter?.reason ?: "No chief complaint recorded",
+        vitals = emptyMap(),
+        notes = state.encounter?.notes ?: "",
+        diagnosis = state.encounter?.reason ?: "",
+        status = state.encounter?.let { "IN_PROGRESS" } ?: "LOADING",
     )
+
+    if (state.isLoading) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            androidx.compose.material3.CircularProgressIndicator()
+        }
+        return
+    }
+    if (state.encounter == null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(Spacing.xxxl),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = state.error ?: "Encounter not found",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
+            androidx.compose.material3.TextButton(onClick = { viewModel.load() }) {
+                Text("Retry")
+            }
+            androidx.compose.material3.TextButton(onClick = onBack) {
+                Text("Go back")
+            }
+        }
+        return
+    }
 
     Scaffold(
         topBar = {

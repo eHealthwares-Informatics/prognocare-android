@@ -87,6 +87,7 @@ fun LoginScreen(
     val isLoading by loginViewModel.state.collectAsState()
     var selectedRole by remember { mutableStateOf(UserRole.Doctor) }
     var configRevealed by remember { mutableStateOf(false) }
+    var tapProgress by remember { mutableStateOf(0) }
     val tapCounter = remember { TapCounter() }
     val config by settingsViewModel.config.collectAsState()
     val isVerifying by settingsViewModel.isVerifying.collectAsState()
@@ -127,6 +128,7 @@ fun LoginScreen(
                 )
                 .clickable {
                     tapCounter.onTap()
+                    tapProgress = tapCounter.count
                     configRevealed = tapCounter.revealed
                 },
             contentAlignment = Alignment.Center,
@@ -168,6 +170,19 @@ fun LoginScreen(
                     FeaturePill(text = "Secure", color = AppThemeColors.current.kpiGreenLight)
                     FeaturePill(text = "Fast", color = AppThemeColors.current.kpiBlueLight)
                     FeaturePill(text = "Reliable", color = AppThemeColors.current.kpiOrangeLight)
+                }
+                // Easter-egg progress hint (after 3+ taps of 10)
+                if (!configRevealed && tapProgress >= 3) {
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = if (tapProgress < 10) {
+                            "${10 - tapProgress} more tap${if (10 - tapProgress == 1) "" else "s"} to unlock server config…"
+                        } else {
+                            "Unlocking…"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.9f),
+                    )
                 }
             }
         }
@@ -476,15 +491,56 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(Spacing.xxl))
 
             AnimatedVisibility(visible = configRevealed, enter = fadeIn(), exit = fadeOut()) {
-                ServerConfigContent(
-                    config = config,
-                    onSave = { emr, conv, channel ->
-                        settingsViewModel.saveConfig(emr, conv, channel)
-                    },
-                    onReset = { settingsViewModel.resetToDefaults() },
-                    isVerifying = isVerifying,
-                    saveResult = saveResult,
-                )
+                Column {
+                    // Current server URLs (read-only) above the editable fields
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(Spacing.md),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.md),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            Text(
+                                text = "Current server URLs",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "EMR: ${config.emrBaseUrl}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Chat: ${config.conversationBaseUrl}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Web channel: ${config.webChannelId}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.md))
+                    ServerConfigContent(
+                        config = config,
+                        onSave = { emr, conv, channel ->
+                            settingsViewModel.saveConfig(emr, conv, channel)
+                        },
+                        onReset = { settingsViewModel.resetToDefaults() },
+                        isVerifying = isVerifying,
+                        saveResult = saveResult,
+                    )
+                }
             }
         }
     }

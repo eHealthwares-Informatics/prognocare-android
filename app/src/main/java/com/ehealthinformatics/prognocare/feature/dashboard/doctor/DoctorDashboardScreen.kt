@@ -313,7 +313,7 @@ fun DoctorDashboardScreen(
                         "SCHEDULED" -> StatusType.Scheduled
                         else -> StatusType.Pending
                     },
-                    onClick = { onNavigateToPatientDetail("patient-${appointment.id}") },
+                    onClick = { onNavigateToPatientDetail(appointment.patientId) },
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }

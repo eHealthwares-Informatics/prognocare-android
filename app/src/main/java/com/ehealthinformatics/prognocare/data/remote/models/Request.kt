@@ -113,6 +113,7 @@ data class AddRequestNoteDto(
 data class SyncRequestDto(
     val externalOrderId: String? = null,
     val externalReference: String? = null,
+    val force: Boolean? = null,
 )
 
 @Serializable

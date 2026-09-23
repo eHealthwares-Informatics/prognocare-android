@@ -42,6 +42,14 @@ data class Patient(
 
     val initials: String
         get() = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
+
+    /** Age in years derived from [dateOfBirth]; 0 when unknown. */
+    val ageYears: Int
+        get() = dateOfBirth?.take(10)?.let { dob ->
+            runCatching {
+                java.time.LocalDate.parse(dob).until(java.time.LocalDate.now()).years
+            }.getOrNull()
+        } ?: 0
 }
 
 @Serializable

@@ -64,12 +64,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.designsystem.theme.AppearanceMode
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Primary
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 import com.ehealthinformatics.prognocare.designsystem.theme.ThemeViewModel
 import com.ehealthinformatics.prognocare.designsystem.theme.ThemeSettingsScreen
+import com.ehealthinformatics.prognocare.feature.settings.ServerConfigContent
+import com.ehealthinformatics.prognocare.feature.settings.TapCounter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,9 +86,13 @@ fun UserProfileScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val signOutComplete by viewModel.signOutComplete.collectAsStateWithLifecycle()
     val themeSettings by themeViewModel.themeSettings.collectAsStateWithLifecycle()
+    val appConfig by viewModel.appConfig.collectAsStateWithLifecycle()
     var showSignOutDialog by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(true) }
     var showThemeSettings by remember { mutableStateOf(false) }
+    var showServerConfig by remember { mutableStateOf(false) }
+    var tapProgress by remember { mutableStateOf(0) }
+    val tapCounter = remember { TapCounter() }
 
     LaunchedEffect(signOutComplete) {
         if (signOutComplete) {
@@ -645,16 +652,87 @@ fun UserProfileScreen(
 
                     Spacer(modifier = Modifier.height(Spacing.xs))
 
-                    // App version
-                    Text(
-                        text = "PrognoCare v1.0.0",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // App version — 10-tap easter egg reveals the server-config panel
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
+                            .padding(horizontal = Spacing.lg)
+                            .clickable {
+                                if (showServerConfig) {
+                                    showServerConfig = false
+                                    tapCounter.reset()
+                                    tapProgress = 0
+                                } else {
+                                    tapCounter.onTap()
+                                    tapProgress = tapCounter.count
+                                    showServerConfig = tapCounter.revealed
+                                }
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = if (showServerConfig) {
+                                "Hide server config"
+                            } else if (tapProgress >= 3) {
+                                "${10 - tapProgress} more tap${if (10 - tapProgress == 1) "" else "s"} to unlock server config…"
+                            } else {
+                                "PrognoCare v1.0.0"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+
+                    AnimatedVisibility(visible = showServerConfig, enter = fadeIn(), exit = fadeOut()) {
+                        Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.base)) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(Spacing.md),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(Spacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                ) {
+                                    Text(
+                                        text = "Current server URLs",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Text(
+                                        text = "EMR: ${appConfig.emrBaseUrl}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "Chat: ${appConfig.conversationBaseUrl}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "Web channel: ${appConfig.webChannelId}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(Spacing.md))
+                            ServerConfigContent(
+                                config = appConfig,
+                                onSave = { emr, conv, channel ->
+                                    viewModel.saveServerConfig(emr, conv, channel)
+                                },
+                                onReset = { viewModel.resetServerConfig() },
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(Spacing.xxl))
                 }

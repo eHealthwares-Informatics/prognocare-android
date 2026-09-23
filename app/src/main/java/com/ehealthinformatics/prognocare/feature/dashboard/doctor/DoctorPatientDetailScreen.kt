@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -45,10 +47,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ehealthinformatics.prognocare.data.remote.models.ClinicalRequest
+import com.ehealthinformatics.prognocare.data.remote.models.Encounter
+import com.ehealthinformatics.prognocare.data.remote.models.FormSubmission
+import com.ehealthinformatics.prognocare.data.remote.models.Patient
 import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
+import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
 import com.ehealthinformatics.prognocare.designsystem.components.StatusBadge
 import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
+import com.ehealthinformatics.prognocare.feature.records.PatientDetailViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +66,14 @@ fun DoctorPatientDetailScreen(
     patientId: String,
     onBack: () -> Unit,
     onOpenDocumentation: ((String) -> Unit)? = null,
+    viewModel: PatientDetailViewModel = hiltViewModel(
+        key = patientId,
+        creationCallback = { factory: PatientDetailViewModel.Factory ->
+            factory.create(patientId)
+        },
+    ),
 ) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Overview", "Encounters", "Requests", "Records")
 
@@ -102,37 +119,51 @@ fun DoctorPatientDetailScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Patient header
-            PatientProfileHeader()
-
-            // Tabs
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title) },
+            when {
+                state.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
+                }
+                state.patient == null -> {
+                    ErrorState(
+                        message = state.error ?: "Patient not found",
+                        onRetry = viewModel::refresh,
                     )
                 }
-            }
+                else -> {
+                    val patient = state.patient!!
+                    PatientProfileHeader(patient)
 
-            // Tab content
-            when (selectedTab) {
-                0 -> OverviewTab(patientId)
-                1 -> EncountersTab()
-                2 -> RequestsTab()
-                3 -> RecordsTab()
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                text = { Text(title) },
+                            )
+                        }
+                    }
+
+                    when (selectedTab) {
+                        0 -> OverviewTab(patient)
+                        1 -> EncountersTab(state.encounters)
+                        2 -> RequestsTab(state.requests)
+                        3 -> RecordsTab(state.submissions)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PatientProfileHeader() {
+private fun PatientProfileHeader(patient: Patient) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -155,7 +186,7 @@ private fun PatientProfileHeader() {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "CO",
+                    text = patient.initials.ifBlank { "?" },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.Bold,
@@ -164,87 +195,197 @@ private fun PatientProfileHeader() {
             Spacer(modifier = Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Chidi Okonkwo",
+                    text = patient.displayName,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
+                val age = patient.ageYears
                 Text(
-                    text = "MRN-00142 · Male · 45 years",
+                    text = "${patient.patientId} · ${patient.gender ?: "—"}" +
+                        (if (age > 0) " · $age years" else ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = { /* call */ }) {
-                Icon(
-                    Icons.Default.Phone,
-                    contentDescription = "Call",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+            if (!patient.phone.isNullOrBlank()) {
+                IconButton(onClick = { /* call */ }) {
+                    Icon(
+                        Icons.Default.Phone,
+                        contentDescription = "Call",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun OverviewTab(patientId: String) {
+private fun OverviewTab(patient: Patient) {
     LazyColumn(
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item {
             InfoSection("Demographics") {
-                InfoRow("Blood Type", "O+")
-                InfoRow("Genotype", "AA")
-                InfoRow("Allergies", "Penicillin")
-                InfoRow("Phone", "+234 801 234 5678")
-                InfoRow("Email", "chidi.okonkwo@email.com")
+                InfoRow("Blood Group", patient.bloodGroup ?: "—")
+                InfoRow("Genotype", patient.genotype ?: "—")
+                InfoRow("Phone", patient.phone ?: "—")
+                InfoRow("Email", patient.email ?: "—")
+                InfoRow("Address", patient.address ?: "—")
+                InfoRow("Next of Kin", patient.nextOfKinName ?: "—")
             }
         }
         item {
-            InfoSection("Active Conditions") {
-                StatusBadge(text = "Hypertension", type = StatusType.Active)
-                StatusBadge(text = "Diabetes Type 2", type = StatusType.Pending)
-            }
-        }
-        item {
-            InfoSection("Current Medications") {
-                Text(
-                    text = "Lisinopril 10mg daily",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "Metformin 500mg twice daily",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            InfoSection("Other") {
+                InfoRow("Marital Status", patient.maritalStatus ?: "—")
+                InfoRow("Occupation", patient.occupation ?: "—")
+                InfoRow("Registered", patient.createdAt?.take(10) ?: "—")
             }
         }
     }
 }
 
 @Composable
-private fun EncountersTab() {
-    EmptyState(
-        icon = Icons.Default.MedicalServices,
-        title = "No recent encounters",
-        message = "Encounters for this patient will appear here",
-    )
+private fun EncountersTab(encounters: List<Encounter>) {
+    if (encounters.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.MedicalServices,
+            title = "No recent encounters",
+            message = "Encounters for this patient will appear here",
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        items(encounters, key = { it.id }) { encounter ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Spacing.base),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.base)) {
+                    Text(
+                        text = encounter.typeDisplay,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            encounter.encounterDatetime?.take(10),
+                            encounter.providerName,
+                            encounter.reason,
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun RequestsTab() {
-    EmptyState(
-        icon = Icons.Default.MedicalServices,
-        title = "No pending requests",
-        message = "Clinical requests for this patient will appear here",
-    )
+private fun RequestsTab(requests: List<ClinicalRequest>) {
+    if (requests.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.MedicalServices,
+            title = "No pending requests",
+            message = "Clinical requests for this patient will appear here",
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        items(requests, key = { it.id }) { request ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Spacing.base),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.base)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = request.typeDisplay,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        RequestStatusBadge(request.status)
+                    }
+                    Text(
+                        text = listOfNotNull(
+                            request.requestNumber,
+                            request.diagnosis,
+                            "${request.items.size} item(s)",
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun RecordsTab() {
-    EmptyState(
-        icon = Icons.Default.MedicalServices,
-        title = "No records yet",
-        message = "Patient records will appear here",
+private fun RecordsTab(submissions: List<FormSubmission>) {
+    if (submissions.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.MedicalServices,
+            title = "No records yet",
+            message = "Documentation for this patient will appear here",
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        items(submissions, key = { it.id }) { submission ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Spacing.base),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.base)) {
+                    Text(
+                        text = submission.formName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            submission.status.replace("_", " ").lowercase()
+                                .replaceFirstChar { it.uppercase() },
+                            submission.createdAt?.take(10),
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RequestStatusBadge(status: String) {
+    val type = when (status) {
+        "COMPLETED" -> StatusType.Completed
+        "CANCELLED", "REJECTED" -> StatusType.Cancelled
+        "IN_PROGRESS" -> StatusType.InProgress
+        else -> StatusType.Pending
+    }
+    StatusBadge(
+        text = status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+        type = type,
     )
 }
 

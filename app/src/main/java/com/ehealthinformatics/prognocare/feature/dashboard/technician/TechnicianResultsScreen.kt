@@ -87,6 +87,10 @@ fun TechnicianResultsScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                text = "Result files live in the LIS — details below come from completed lab orders",
+            )
+
             // ── Filter Chips ─────────────────────────────────
             androidx.compose.foundation.layout.Row(
                 modifier = Modifier

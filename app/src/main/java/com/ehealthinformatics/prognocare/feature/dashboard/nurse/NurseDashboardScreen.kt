@@ -368,6 +368,14 @@ fun NurseDashboardScreen(
                 Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
                     SectionHeader(title = "Recent Vitals Recorded")
                     Spacer(modifier = Modifier.height(Spacing.md))
+                    if (state.recentVitals.isEmpty()) {
+                        Text(
+                            text = "Vitals recorded through documentation forms will appear here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Spacing.sm),
+                        )
+                    }
                 }
             }
 

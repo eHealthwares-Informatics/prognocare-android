@@ -82,6 +82,9 @@ import com.ehealthinformatics.prognocare.feature.chat.ChatScreen
 import com.ehealthinformatics.prognocare.feature.chat.ConversationListScreen
 import com.ehealthinformatics.prognocare.feature.forms.DynamicFormScreen
 import com.ehealthinformatics.prognocare.feature.forms.FormPickerScreen
+import com.ehealthinformatics.prognocare.feature.requests.CreateRequestScreen
+import com.ehealthinformatics.prognocare.feature.requests.RequestDetailScreen
+import com.ehealthinformatics.prognocare.feature.requests.RequestsListScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorDashboardScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorEncounterScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPrescriptionScreen
@@ -387,7 +390,7 @@ fun PrognoCareNavGraph(
             ) { backStackEntry ->
                 val encounterId = backStackEntry.arguments?.getString("encounterId") ?: return@composable
                 DoctorEncounterScreen(
-                    patientId = encounterId,
+                    encounterId = encounterId,
                     onBack = { navController.popBackStack() },
                     onAddNote = { /* TODO: show add note dialog */ },
                     onAddDiagnosis = { /* TODO: show add diagnosis dialog */ },
@@ -396,10 +399,29 @@ fun PrognoCareNavGraph(
             }
 
             composable(DoctorRoutes.REQUESTS) {
-                DoctorPrescriptionScreen(
-                    patientName = "Patient", // TODO: pass from arguments
+                RequestsListScreen(
+                    title = "My Requests",
                     onBack = { navController.popBackStack() },
-                    onSave = { navController.popBackStack() },
+                    onRequestClick = { id -> navController.navigate(DoctorRoutes.requestDetail(id)) },
+                    onCreateRequest = { navController.navigate(DoctorRoutes.CREATE_REQUEST) },
+                )
+            }
+
+            composable(DoctorRoutes.CREATE_REQUEST) {
+                CreateRequestScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaved = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = DoctorRoutes.REQUEST_DETAIL,
+                arguments = listOf(navArgument("requestId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val requestId = backStackEntry.arguments?.getString("requestId") ?: return@composable
+                RequestDetailScreen(
+                    requestId = requestId,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -577,7 +599,15 @@ fun PrognoCareNavGraph(
             }
 
             composable(SpecialistRoutes.CONSULTATION_NOTES) {
-                // TODO: ConsultationNotesScreen
+                FormPickerScreen(
+                    patientId = "",
+                    visitId = null,
+                    encounterId = null,
+                    onPick = { formId ->
+                        navController.navigate(FormsRoutes.form(formId))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(SpecialistRoutes.PATIENT_LIST) {
@@ -665,11 +695,16 @@ fun PrognoCareNavGraph(
             }
 
             composable(FinanceRoutes.PAYMENTS) {
-                // Payments list screen
+                com.ehealthinformatics.prognocare.feature.dashboard.finance.FinancePaymentProvidersScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(FinanceRoutes.PATIENT_SEARCH) {
-                // Patient search screen
+                com.ehealthinformatics.prognocare.feature.shared.PatientSearchScreen(
+                    title = "Patient Billing Lookup",
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             // Admin
@@ -684,7 +719,10 @@ fun PrognoCareNavGraph(
             }
 
             composable(AdminRoutes.PATIENT_SEARCH) {
-                // Patient search screen
+                com.ehealthinformatics.prognocare.feature.shared.PatientSearchScreen(
+                    title = "Patient Directory",
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(AdminRoutes.CHECKIN) {
@@ -697,7 +735,12 @@ fun PrognoCareNavGraph(
             composable(AdminRoutes.STAFF) {
                 AdminStaffManagementScreen(
                     onBack = { navController.popBackStack() },
-                    onAddStaff = { /* TODO: add staff screen */ },
+                )
+            }
+
+            composable(AdminRoutes.FACILITIES) {
+                com.ehealthinformatics.prognocare.feature.dashboard.admin.AdminFacilitiesScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
 

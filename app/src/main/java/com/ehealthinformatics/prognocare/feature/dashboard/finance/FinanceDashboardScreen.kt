@@ -298,6 +298,12 @@ fun FinanceDashboardScreen(
                 }
             }
 
+            item {
+                com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
+                    text = "Not available — billing module lives in rxsoft-backend, not EMR",
+                )
+            }
+
             items(state.recentBills) { bill ->
                 BillCard(
                     bill = bill,

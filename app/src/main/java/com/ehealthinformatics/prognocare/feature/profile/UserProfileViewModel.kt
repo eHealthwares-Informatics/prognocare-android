@@ -3,19 +3,28 @@ package com.ehealthinformatics.prognocare.feature.profile
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ehealthinformatics.prognocare.data.auth.SessionStore
+import com.ehealthinformatics.prognocare.data.config.AppConfig
+import com.ehealthinformatics.prognocare.data.config.AppConfigStore
+import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
+import com.ehealthinformatics.prognocare.data.remote.models.MeResponse
 import com.ehealthinformatics.prognocare.feature.splash.SplashViewModel
 import com.ehealthinformatics.prognocare.navigation.UserRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class UserProfileViewModel @Inject constructor(
+    private val retrofitClient: RetrofitClient,
+    private val configStore: AppConfigStore,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -25,25 +34,70 @@ class UserProfileViewModel @Inject constructor(
     private val _signOutComplete = MutableStateFlow(false)
     val signOutComplete: StateFlow<Boolean> = _signOutComplete.asStateFlow()
 
+    val appConfig: StateFlow<AppConfig> = configStore.config
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), configStore.config.value)
+
     init {
         loadProfile()
     }
 
     private fun loadProfile() {
         viewModelScope.launch {
-            val prefs = context.getSharedPreferences("prognocare_auth", Context.MODE_PRIVATE)
-            val roleOrdinal = prefs.getInt("user_role", 0)
-            val role = UserRole.entries.getOrNull(roleOrdinal) ?: UserRole.Doctor
-
-            // Mock profile data based on role
-            val profile = getMockProfile(role)
-            _state.update {
-                it.copy(
-                    isLoading = false,
-                    profile = profile,
-                )
-            }
+            val role = SessionStore.getRole(context) ?: SplashViewModel.loadRole(context) ?: UserRole.Doctor
+            val profile = loadProfileFromApi(role)
+            _state.update { it.copy(isLoading = false, profile = profile) }
         }
+    }
+
+    /**
+     * Loads the signed-in identity via GET /api/auth/me plus the linked staff
+     * record (GET /api/staff?userId=…) when one exists. Falls back to the
+     * role-based demo profile when the backend is unreachable.
+     */
+    private suspend fun loadProfileFromApi(role: UserRole): UserProfile {
+        val me = runCatching { fetchMe() }.getOrNull()
+        val staff = me?.let { runCatching { fetchMyStaff(it.id) }.getOrNull() }
+        if (me == null && staff == null) return getMockProfile(role)
+        return UserProfile(
+            id = staff?.id ?: me?.id.orEmpty(),
+            name = staff?.let { "${it.firstName} ${it.lastName}".trim() }
+                ?: me?.username.orEmpty().ifBlank { role.displayName },
+            email = staff?.email ?: me?.username.orEmpty(),
+            phone = staff?.phone.orEmpty(),
+            role = role,
+            department = staff?.department ?: role.displayName,
+            facility = SessionStore.getStaffLocation(context).orEmpty().ifBlank { "PrognoCare" },
+            employeeId = staff?.staffNumber,
+            joinDate = staff?.hireDate,
+        )
+    }
+
+    private suspend fun fetchMe(): MeResponse {
+        val response = retrofitClient.apis.value.authApi.me()
+        if (!response.isSuccessful) throw com.ehealthinformatics.prognocare.feature.appointments.ApiException(response.code(), "me failed")
+        return response.body() ?: throw com.ehealthinformatics.prognocare.feature.appointments.ApiException(response.code(), "empty me")
+    }
+
+    private suspend fun fetchMyStaff(userId: String): com.ehealthinformatics.prognocare.data.remote.models.Staff? {
+        val response = retrofitClient.apis.value.staffApi.list(userId = userId, limit = 1)
+        if (!response.isSuccessful) return null
+        return response.body()?.data?.firstOrNull()
+    }
+
+    fun saveServerConfig(emr: String, conversation: String, webChannelId: String) {
+        viewModelScope.launch {
+            configStore.updateConfig(
+                configStore.config.value.copy(
+                    emrBaseUrl = emr,
+                    conversationBaseUrl = conversation,
+                    webChannelId = webChannelId,
+                ),
+            )
+        }
+    }
+
+    fun resetServerConfig() {
+        viewModelScope.launch { configStore.resetToDefaults() }
     }
 
     fun signOut() {

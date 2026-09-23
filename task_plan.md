@@ -4,7 +4,7 @@
 Wire the PrognoCare Android app to the real EMR backend (port 8093, /api) and Conversation Engine (chat), with runtime-configurable URLs (hidden 7-tap input + settings view), merged dashboard metrics, full chat with option controls, config maps (view→form, mobile role→backend role), chat notifications, new backend roles (Specialist/Finance), and tests per feature.
 
 ## Current Phase
-Phase 6 (in progress)
+Phase 8 (complete) — all 9 roles wired to the EMR backend + 10-tap server-config easter egg
 
 ## Key Decisions
 | Decision | Rationale |
@@ -90,3 +90,19 @@ Phase 6 (in progress)
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 |       |         |            |
+
+### Phase 8 (user direction): Login + all 9 role features + 10-tap easter egg
+- [x] Easter egg standardized at 10 taps (TapCounter default), tap-progress hint after 3 taps, current-URL display above the editable config; also reachable from the profile version row (10 taps toggles the same ServerConfigContent; saves app-wide via AppConfigStore)
+- [x] EMR: GET /api/staff?userId= filter (self-scoping) + spec
+- [x] SessionStore: identity userId + staff link + role persisted at login; cleared on sign-out
+- [x] EmrRepository (dashboard/requests/encounters/staff/locations/patients) + PatientSearchScreen, NotAvailableBadge/DemoDataChip
+- [x] Doctor: real dashboard (self-scoped), patient list/detail (live encounters/requests/docs), encounter screen fixed to real encounterId, Requests list/detail/create with line items + transitions + notes
+- [x] Nurse: real check-in queue/tasks, vitals via VITALS form submission, medication admin on PRESCRIPTION requests (transition+note)
+- [x] Patient: dashboard/meds/records keyed to linked MRN via SessionStore
+- [x] Specialist: real consultations/patients, consultation-notes opens FormPicker; referrals demo-tagged
+- [x] Therapist: real sessions; plans/assessments demo-tagged
+- [x] Technician: LAB requests as orders with real status transitions; results demo-tagged (LIS owns files)
+- [x] Support: real today's schedule + check-in/out; tickets demo-tagged
+- [x] Finance: real KPIs + payment providers + patient lookup; billing demo-tagged (rxsoft-backend owns billing)
+- [x] Admin: real KPIs, check-in queue, staff CRUD (add-staff dialog), facilities from LocationApi, patient directory
+- [x] Tests: TapCounter 10-tap suite, RequestsApiContractTest (7 tests); 79 Android unit tests green; EMR 176 tests green; assembleDebug produces APK
