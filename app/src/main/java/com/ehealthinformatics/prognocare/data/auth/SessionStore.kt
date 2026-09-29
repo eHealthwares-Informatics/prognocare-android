@@ -19,6 +19,9 @@ object SessionStore {
     private const val KEY_STAFF_ID = "staff_id"
     private const val KEY_STAFF_NAME = "staff_name"
     private const val KEY_STAFF_LOCATION = "staff_location"
+    private const val KEY_STAFF_LOCATION_ID = "staff_location_id"
+    private const val KEY_ACTIVE_LOCATION_ID = "active_location_id"
+    private const val KEY_ACTIVE_LOCATION_NAME = "active_location_name"
 
     // ── Patient self-identity (patient role) ─────────────────────
 
@@ -78,6 +81,33 @@ object SessionStore {
 
     fun saveStaffLocation(context: Context, location: String) {
         prefs(context).edit().putString(KEY_STAFF_LOCATION, location).apply()
+    }
+
+    // ── Location scope (location-based queries) ─────────────────
+
+    /** Location id from the signed-in user's staff record (optional). */
+    fun getStaffLocationId(context: Context): String? =
+        prefs(context).getString(KEY_STAFF_LOCATION_ID, null)?.takeIf { it.isNotBlank() }
+
+    fun saveStaffLocationId(context: Context, locationId: String?) {
+        prefs(context).edit()
+            .putString(KEY_STAFF_LOCATION_ID, locationId?.takeIf { it.isNotBlank() })
+            .apply()
+    }
+
+    /** The location the user explicitly picked to scope queries to. */
+    fun getActiveLocationId(context: Context): String? =
+        prefs(context).getString(KEY_ACTIVE_LOCATION_ID, null)?.takeIf { it.isNotBlank() }
+
+    /** Display label cached alongside the active location id. */
+    fun getActiveLocationName(context: Context): String? =
+        prefs(context).getString(KEY_ACTIVE_LOCATION_NAME, null)?.takeIf { it.isNotBlank() }
+
+    fun saveActiveLocation(context: Context, locationId: String?, locationName: String?) {
+        prefs(context).edit()
+            .putString(KEY_ACTIVE_LOCATION_ID, locationId?.takeIf { it.isNotBlank() })
+            .putString(KEY_ACTIVE_LOCATION_NAME, locationName?.takeIf { it.isNotBlank() })
+            .apply()
     }
 
     private fun prefs(context: Context) =

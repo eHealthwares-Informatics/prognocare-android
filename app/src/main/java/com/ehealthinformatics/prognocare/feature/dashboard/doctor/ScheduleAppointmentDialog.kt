@@ -35,7 +35,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.ehealthinformatics.prognocare.data.location.LocationScope
 import com.ehealthinformatics.prognocare.data.remote.models.AppointmentPriority
+import com.ehealthinformatics.prognocare.data.remote.models.Location
 import com.ehealthinformatics.prognocare.data.remote.models.AppointmentType
 import com.ehealthinformatics.prognocare.data.remote.models.CreateAppointmentDto
 import com.ehealthinformatics.prognocare.data.remote.models.Patient
@@ -56,6 +58,8 @@ data class ScheduleFormState(
     val isSearchingPatients: Boolean = false,
     val selectedPatient: Patient? = null,
     val selectedProvider: Staff? = null,
+    val locations: List<Location> = emptyList(),
+    val selectedLocationId: String? = null,
     val appointmentType: String = AppointmentType.CONSULTATION.name,
     val priority: String = AppointmentPriority.ROUTINE.name,
     val date: String = "",
@@ -68,6 +72,7 @@ data class ScheduleFormState(
 @HiltViewModel
 class ScheduleAppointmentViewModel @Inject constructor(
     private val repository: AppointmentsRepository,
+    private val locationScope: LocationScope,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScheduleFormState())
@@ -77,8 +82,15 @@ class ScheduleAppointmentViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(date = repository.today()) }
             loadProviders()
+            // Preselect the user's active location scope; the picker below
+            // can change or clear it per appointment.
+            _state.update { it.copy(selectedLocationId = locationScope.current().id) }
+            runCatching { locationScope.locations(limit = 20) }
+                .onSuccess { locations -> _state.update { it.copy(locations = locations) } }
         }
     }
+
+    fun setLocation(locationId: String?) = _state.update { it.copy(selectedLocationId = locationId) }
 
     fun searchPatients(query: String) {
         viewModelScope.launch {
@@ -126,6 +138,7 @@ class ScheduleAppointmentViewModel @Inject constructor(
                         startTime = snapshot.startTime,
                         providerId = snapshot.selectedProvider?.id,
                         providerName = snapshot.selectedProvider?.displayName,
+                        locationId = snapshot.selectedLocationId,
                         priority = snapshot.priority,
                         reason = snapshot.reason.takeIf { it.isNotBlank() },
                     ),
@@ -247,6 +260,23 @@ fun ScheduleAppointmentDialog(
                         selected = state.priority == priority.name,
                         onClick = { viewModel.setPriority(priority.name) },
                         label = { Text(priority.name.lowercase()) },
+                    )
+                }
+            }
+
+            // Location
+            Text("Location", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                FilterChip(
+                    selected = state.selectedLocationId == null,
+                    onClick = { viewModel.setLocation(null) },
+                    label = { Text("No location") },
+                )
+                state.locations.forEach { location ->
+                    FilterChip(
+                        selected = state.selectedLocationId == location.id,
+                        onClick = { viewModel.setLocation(location.id) },
+                        label = { Text(location.name) },
                     )
                 }
             }

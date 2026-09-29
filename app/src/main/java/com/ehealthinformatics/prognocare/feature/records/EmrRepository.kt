@@ -1,13 +1,20 @@
 package com.ehealthinformatics.prognocare.feature.records
 
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
+import com.ehealthinformatics.prognocare.data.remote.models.AdministerMedicationDto
 import com.ehealthinformatics.prognocare.data.remote.models.AddRequestNoteDto
 import com.ehealthinformatics.prognocare.data.remote.models.ClinicalRequest
+import com.ehealthinformatics.prognocare.data.remote.models.CompleteReferralDto
+import com.ehealthinformatics.prognocare.data.remote.models.CreateMedicationDto
+import com.ehealthinformatics.prognocare.data.remote.models.CreateReferralDto
+import com.ehealthinformatics.prognocare.data.remote.models.DecideReferralDto
 import com.ehealthinformatics.prognocare.data.remote.models.CreateRequestDto
 import com.ehealthinformatics.prognocare.data.remote.models.DashboardSummary
 import com.ehealthinformatics.prognocare.data.remote.models.Encounter
 import com.ehealthinformatics.prognocare.data.remote.models.Location
+import com.ehealthinformatics.prognocare.data.remote.models.Medication
 import com.ehealthinformatics.prognocare.data.remote.models.PaginatedResponse
+import com.ehealthinformatics.prognocare.data.remote.models.Referral
 import com.ehealthinformatics.prognocare.data.remote.models.RequestHistoryEntry
 import com.ehealthinformatics.prognocare.data.remote.models.Staff
 import com.ehealthinformatics.prognocare.data.remote.models.SyncRequestDto
@@ -122,7 +129,87 @@ class EmrRepository @Inject constructor(
         return response.body() ?: throw ApiException(response.code(), "Empty response")
     }
 
-    // ── Staff ────────────────────────────────────────────────────
+    // ── Referrals ────────────────────────────────────────────────
+
+    suspend fun referrals(
+        status: String? = null,
+        direction: String? = null,
+        providerId: String? = null,
+        patientId: String? = null,
+        encounterId: String? = null,
+        limit: Int = 50,
+    ): List<Referral> {
+        val response = retrofitClient.apis.first().referralApi.list(
+            status = status,
+            direction = direction,
+            providerId = providerId,
+            patientId = patientId,
+            encounterId = encounterId,
+            limit = limit,
+        )
+        if (!response.isSuccessful) throw failure(response)
+        return response.body()?.data.orEmpty()
+    }
+
+    suspend fun referral(id: String): Referral {
+        val response = retrofitClient.apis.first().referralApi.getById(id)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    suspend fun createReferral(dto: CreateReferralDto): Referral {
+        val response = retrofitClient.apis.first().referralApi.create(dto)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    suspend fun decideReferral(id: String, dto: DecideReferralDto): Referral {
+        val response = retrofitClient.apis.first().referralApi.decide(id, dto)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    suspend fun completeReferral(id: String, dto: CompleteReferralDto): Referral {
+        val response = retrofitClient.apis.first().referralApi.complete(id, dto)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    // ── Medications ──────────────────────────────────────────────
+
+    suspend fun medications(
+        status: String? = null,
+        patientId: String? = null,
+        requestId: String? = null,
+        encounterId: String? = null,
+        administered: String? = null,
+        limit: Int = 100,
+    ): List<Medication> {
+        val response = retrofitClient.apis.first().medicationApi.list(
+            status = status,
+            patientId = patientId,
+            requestId = requestId,
+            encounterId = encounterId,
+            administered = administered,
+            limit = limit,
+        )
+        if (!response.isSuccessful) throw failure(response)
+        return response.body()?.data.orEmpty()
+    }
+
+    suspend fun createMedication(dto: CreateMedicationDto): Medication {
+        val response = retrofitClient.apis.first().medicationApi.create(dto)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    suspend fun administerMedication(id: String, dto: AdministerMedicationDto): Medication {
+        val response = retrofitClient.apis.first().medicationApi.administer(id, dto)
+        if (!response.isSuccessful) throw failure(response)
+        return response.body() ?: throw ApiException(response.code(), "Empty response")
+    }
+
+    // ── Staff ────────────────────────────────────────────────────────
 
     suspend fun staff(
         search: String? = null,

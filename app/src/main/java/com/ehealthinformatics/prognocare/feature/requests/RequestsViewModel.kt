@@ -38,10 +38,22 @@ data class RequestDetailState(
     val error: String? = null,
 )
 
+enum class RequestScope(val label: String) {
+    PATIENT("Patient"),
+    VISIT("Visit"),
+    ENCOUNTER("Encounter"),
+}
+
 data class CreateRequestState(
+    val scope: RequestScope = RequestScope.PATIENT,
     val patientQuery: String = "",
     val patientResults: List<Patient> = emptyList(),
     val selectedPatient: Patient? = null,
+    val visits: List<com.ehealthinformatics.prognocare.data.remote.models.Visit> = emptyList(),
+    val selectedVisit: com.ehealthinformatics.prognocare.data.remote.models.Visit? = null,
+    val encounters: List<com.ehealthinformatics.prognocare.data.remote.models.Encounter> = emptyList(),
+    val selectedEncounter: com.ehealthinformatics.prognocare.data.remote.models.Encounter? = null,
+    val isLoadingScope: Boolean = false,
     val requestType: String = "LAB",
     val priority: String = "ROUTINE",
     val diagnosis: String = "",
@@ -230,9 +242,22 @@ class CreateRequestViewModel @Inject constructor(
                     limit = 10,
                     search = query,
                 )
-                _state.value = _state.value.copy(
-                    patientResults = if (response.isSuccessful) response.body()?.data.orEmpty() else emptyList(),
-                )
+                var results = if (response.isSuccessful) response.body()?.data.orEmpty() else emptyList()
+                // Patients with an ongoing visit or an active encounter are
+                // covered by the Visit/Encounter scopes — hide them here so a
+                // patient never appears in two scopes at once.
+                runCatching {
+                    val apis = retrofitClient.apis.value
+                    val visitPatients = apis.visitApi.list(status = "ONGOING", limit = 100)
+                        .body()?.data.orEmpty().map { it.patientId }
+                    val encounterPatients = apis.encounterApi.list(limit = 100)
+                        .body()?.data.orEmpty()
+                        .filter { it.isActive }
+                        .map { it.patientId }
+                    val covered = (visitPatients + encounterPatients).toSet()
+                    results = results.filter { it.patientId !in covered }
+                }.getOrDefault(Unit)
+                _state.value = _state.value.copy(patientResults = results.distinctBy { it.id })
             } catch (e: Exception) {
                 _state.value = _state.value.copy(patientResults = emptyList())
             }
@@ -244,6 +269,97 @@ class CreateRequestViewModel @Inject constructor(
             selectedPatient = patient,
             patientResults = emptyList(),
             patientQuery = patient.displayName,
+            selectedVisit = null,
+            selectedEncounter = null,
+        )
+    }
+
+    fun setScope(scope: RequestScope) {
+        if (scope == _state.value.scope) return
+        _state.value = _state.value.copy(
+            scope = scope,
+            selectedPatient = null,
+            selectedVisit = null,
+            selectedEncounter = null,
+            patientQuery = "",
+            patientResults = emptyList(),
+            visits = emptyList(),
+            encounters = emptyList(),
+            isLoadingScope = scope != RequestScope.PATIENT,
+        )
+        when (scope) {
+            RequestScope.PATIENT -> Unit
+            RequestScope.VISIT -> loadVisits()
+            RequestScope.ENCOUNTER -> loadEncounters()
+        }
+    }
+
+    /**
+     * Ongoing visits, one per patient, excluding patients that already have
+     * an ACTIVE encounter (those belong to the Encounter scope).
+     */
+    private fun loadVisits() {
+        viewModelScope.launch {
+            try {
+                val apis = retrofitClient.apis.value
+                val visits = apis.visitApi.list(status = "ONGOING", limit = 100)
+                    .body()?.data.orEmpty()
+                val activeEncounterPatients = apis.encounterApi.list(limit = 100)
+                    .body()?.data.orEmpty()
+                    .filter { it.isActive }
+                    .map { it.patientId }
+                    .toSet()
+                _state.value = _state.value.copy(
+                    visits = visits
+                        .filter { it.patientId !in activeEncounterPatients }
+                        .distinctBy { it.patientId },
+                    isLoadingScope = false,
+                )
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(visits = emptyList(), isLoadingScope = false)
+            }
+        }
+    }
+
+    /** Active encounters, one per patient. */
+    private fun loadEncounters() {
+        viewModelScope.launch {
+            try {
+                val encounters = retrofitClient.apis.value.encounterApi.list(limit = 100)
+                    .body()?.data.orEmpty()
+                    .filter { it.isActive }
+                    .distinctBy { it.patientId }
+                _state.value = _state.value.copy(encounters = encounters, isLoadingScope = false)
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(encounters = emptyList(), isLoadingScope = false)
+            }
+        }
+    }
+
+    fun clearSelection() {
+        _state.value = _state.value.copy(
+            selectedPatient = null,
+            selectedVisit = null,
+            selectedEncounter = null,
+            patientQuery = "",
+        )
+    }
+
+    fun selectVisit(visit: com.ehealthinformatics.prognocare.data.remote.models.Visit) {
+        _state.value = _state.value.copy(
+            selectedVisit = visit,
+            selectedPatient = null,
+            selectedEncounter = null,
+            patientQuery = visit.patientName.ifBlank { "Patient ${'$'}{visit.patientId}" },
+        )
+    }
+
+    fun selectEncounter(encounter: com.ehealthinformatics.prognocare.data.remote.models.Encounter) {
+        _state.value = _state.value.copy(
+            selectedEncounter = encounter,
+            selectedPatient = null,
+            selectedVisit = null,
+            patientQuery = "Encounter ${'$'}{encounter.encounterNumber ?: encounter.id.take(8)}",
         )
     }
 
@@ -270,9 +386,31 @@ class CreateRequestViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         val patient = current.selectedPatient
-        if (patient == null) {
-            viewModelScope.launch { _events.emit(RequestUiEvent.Error("Select a patient first")) }
-            return
+        val visit = current.selectedVisit
+        val encounter = current.selectedEncounter
+        when (current.scope) {
+            RequestScope.PATIENT -> if (patient == null) {
+                viewModelScope.launch { _events.emit(RequestUiEvent.Error("Select a patient first")) }
+                return
+            }
+            RequestScope.VISIT -> if (visit == null) {
+                viewModelScope.launch { _events.emit(RequestUiEvent.Error("Select a visit first")) }
+                return
+            }
+            RequestScope.ENCOUNTER -> if (encounter == null) {
+                viewModelScope.launch { _events.emit(RequestUiEvent.Error("Select an encounter first")) }
+                return
+            }
+        }
+        val patientId = when (current.scope) {
+            RequestScope.PATIENT -> patient!!.patientId.ifBlank { patient.id }
+            RequestScope.VISIT -> visit!!.patientId
+            RequestScope.ENCOUNTER -> encounter!!.patientId
+        }
+        val patientName = when (current.scope) {
+            RequestScope.PATIENT -> patient!!.displayName
+            RequestScope.VISIT -> visit!!.patientName.ifBlank { "Patient ${'$'}{visit.patientId}" }
+            RequestScope.ENCOUNTER -> "Patient ${'$'}{encounter!!.patientId}"
         }
         if (current.items.all { it.name.isBlank() }) {
             viewModelScope.launch { _events.emit(RequestUiEvent.Error("Add at least one item with a name")) }
@@ -286,8 +424,10 @@ class CreateRequestViewModel @Inject constructor(
                 val staffName = SessionStore.getStaffName(context)
                 emrRepository.createRequest(
                     CreateRequestDto(
-                        patientId = patient.id,
-                        patientName = patient.displayName,
+                        patientId = patientId,
+                        patientName = patientName,
+                        visitId = visit?.id ?: encounter?.visitId,
+                        encounterId = encounter?.id,
                         requestType = current.requestType,
                         priority = current.priority,
                         diagnosis = current.diagnosis.takeIf { it.isNotBlank() },

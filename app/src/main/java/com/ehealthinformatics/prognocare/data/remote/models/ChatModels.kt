@@ -104,11 +104,17 @@ data class ExchangeMessagesResponse(
     val nextCursor: String? = null,
 )
 
+/**
+ * Inbound message to the Conversation Engine via POST /webhooks/web. The
+ * channel is addressed by its stable code (e.g. PROGNOCARE_MESSAGING) — never
+ * a DB id, which is environment-specific and breaks after re-seeding.
+ */
 @Serializable
 data class SendWebhookDto(
-    val channelId: String,
+    val channelCode: String,
     val senderPhone: String,
     val text: String,
     val conversationId: String? = null,
     val questionnaireCode: String? = null,
+    val newConversation: Boolean = false,
 )

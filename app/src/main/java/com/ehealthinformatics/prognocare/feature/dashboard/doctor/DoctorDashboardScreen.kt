@@ -35,7 +35,9 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,6 +56,7 @@ import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorDashboardScreen(
     onNavigateToAppointments: () -> Unit,
@@ -61,6 +64,9 @@ fun DoctorDashboardScreen(
     onNavigateToPatientDetail: (String) -> Unit,
     onNavigateToChat: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToEncounters: () -> Unit = {},
+    onNavigateToNewRequest: () -> Unit = {},
+    onNavigateToClinicalNote: () -> Unit = {},
     viewModel: DoctorDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -68,7 +74,7 @@ fun DoctorDashboardScreen(
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { /* new encounter */ },
+                onClick = onNavigateToEncounters,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(Spacing.lg),
@@ -83,6 +89,10 @@ fun DoctorDashboardScreen(
             }
         },
     ) { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.retry() },
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -254,7 +264,7 @@ fun DoctorDashboardScreen(
                             label = "Clinical Note",
                             iconTint = AppThemeColors.current.kpiBlue,
                             iconBg = AppThemeColors.current.kpiBlueLight,
-                            onClick = { /* new encounter */ },
+                            onClick = onNavigateToClinicalNote,
                             modifier = Modifier.weight(1f),
                         )
                         DashboardQuickAction(
@@ -262,7 +272,7 @@ fun DoctorDashboardScreen(
                             label = "New Request",
                             iconTint = AppThemeColors.current.kpiPurple,
                             iconBg = AppThemeColors.current.kpiPurpleLight,
-                            onClick = { /* new request */ },
+                            onClick = onNavigateToNewRequest,
                             modifier = Modifier.weight(1f),
                         )
                         DashboardQuickAction(
@@ -320,6 +330,7 @@ fun DoctorDashboardScreen(
 
             // Bottom spacer for FAB
             item { Spacer(modifier = Modifier.height(Spacing.lg)) }
+        }
         }
     }
 }

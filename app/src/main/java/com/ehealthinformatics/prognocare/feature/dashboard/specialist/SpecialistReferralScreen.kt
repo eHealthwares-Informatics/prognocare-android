@@ -20,9 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -31,11 +33,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,15 +52,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ehealthinformatics.prognocare.data.remote.models.Referral
 import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
+import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
 import com.ehealthinformatics.prognocare.designsystem.components.StatusBadge
 import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
+import android.widget.Toast
+
+private val STATUS_FILTERS = listOf("All", "PENDING", "ACCEPTED", "DECLINED", "COMPLETED")
+
+@Composable
+private fun statusType(status: String): StatusType = when (status) {
+    "PENDING" -> StatusType.Pending
+    "ACCEPTED" -> StatusType.Active
+    "DECLINED" -> StatusType.Cancelled
+    "COMPLETED" -> StatusType.Completed
+    else -> StatusType.Pending
+}
+
+private fun statusLabel(status: String): String =
+    status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+
+@Composable
+private fun priorityColor(priority: String): Color = when (priority) {
+    "URGENT" -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.primary
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,23 +93,31 @@ fun SpecialistReferralScreen(
     onPatientClick: (String) -> Unit,
     viewModel: SpecialistDashboardViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    var selectedFilter by remember { mutableStateOf("All") }
+    val referrals by viewModel.referrals.collectAsStateWithLifecycle()
+    val referralsLoading by viewModel.referralsLoading.collectAsStateWithLifecycle()
+    val referralsError by viewModel.referralsError.collectAsStateWithLifecycle()
+    val direction by viewModel.direction.collectAsStateWithLifecycle()
+    val statusFilter by viewModel.statusFilter.collectAsStateWithLifecycle()
+    val createState by viewModel.createState.collectAsStateWithLifecycle()
 
-    val filterOptions = listOf("All", "Pending", "In Review", "Accepted", "Completed")
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var showCreate by remember { mutableStateOf(false) }
 
-    val filteredReferrals = state.recentReferrals.filter { referral ->
-        when (selectedFilter) {
-            "All" -> true
-            "Pending" -> referral.status == ReferralStatus.PENDING
-            "In Review" -> referral.status == ReferralStatus.IN_REVIEW
-            "Accepted" -> referral.status == ReferralStatus.ACCEPTED
-            "Completed" -> referral.status == ReferralStatus.COMPLETED
-            else -> true
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ReferralUiEvent.Success -> {
+                    snackbarHostState.showSnackbar(event.message)
+                    showCreate = false
+                }
+                is ReferralUiEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+            }
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Referrals") },
@@ -93,99 +133,137 @@ fun SpecialistReferralScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* new referral */ },
+                onClick = {
+                    viewModel.loadCreateScope()
+                    showCreate = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
             ) {
                 Icon(Icons.Default.Add, contentDescription = "New Referral")
             }
         },
     ) { innerPadding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = referralsLoading,
+            onRefresh = { viewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // ── Filter Chips ────────────────────────────────
-            androidx.compose.foundation.lazy.LazyRow(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                items(filterOptions.size) { index ->
-                    FilterChip(
-                        selected = selectedFilter == filterOptions[index],
-                        onClick = { selectedFilter = filterOptions[index] },
-                        label = {
-                            Text(
-                                text = filterOptions[index],
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.sm))
-
-            // ── Referrals List ──────────────────────────────
-            if (filteredReferrals.isEmpty()) {
-                EmptyState(
-                    icon = Icons.Default.Add,
-                    title = "No referrals found",
-                    message = when (selectedFilter) {
-                        "Pending" -> "No pending referrals at the moment"
-                        "In Review" -> "No referrals currently in review"
-                        else -> "No referrals match the current filter"
-                    },
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = Spacing.lg,
-                        vertical = Spacing.base,
-                    ),
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ── Direction tabs ──────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    items(filteredReferrals) { referral ->
-                        ReferralDetailCard(
-                            referral = referral,
-                            onClick = { onPatientClick(referral.patientMrn) },
-                            onAccept = { { /* referrals not backend-backed yet */ } },
-                            onDecline = { { /* referrals not backend-backed yet */ } },
+                    ReferralDirection.entries.forEach { dir ->
+                        FilterChip(
+                            selected = direction == dir,
+                            onClick = { viewModel.setDirection(dir) },
+                            label = { Text(dir.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(Spacing.xxxl)) }
+                }
+
+                // ── Status filter chips ─────────────────────────
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    items(STATUS_FILTERS.size) { index ->
+                        val option = STATUS_FILTERS[index]
+                        FilterChip(
+                            selected = statusFilter == (option.takeIf { it != "All" }),
+                            onClick = {
+                                viewModel.setStatusFilter(option.takeIf { it != "All" })
+                            },
+                            label = {
+                                Text(
+                                    text = option.takeIf { it != "All" }
+                                        ?.let { statusLabel(it) } ?: "All",
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Spacing.sm))
+
+                when {
+                    referralsError != null && referrals.isEmpty() -> {
+                        ErrorState(
+                            message = referralsError ?: "Failed to load",
+                            onRetry = { viewModel.refresh() },
+                        )
+                    }
+                    !referralsLoading && referrals.isEmpty() -> {
+                        EmptyState(
+                            icon = Icons.Default.Add,
+                            title = if (direction == ReferralDirection.INCOMING) {
+                                "No incoming referrals"
+                            } else {
+                                "No outgoing referrals"
+                            },
+                            message = "Referrals will appear here as they are created.",
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = Spacing.lg,
+                                vertical = Spacing.base,
+                            ),
+                        ) {
+                            items(referrals, key = { it.id }) { referral ->
+                                ReferralCard(
+                                    referral = referral,
+                                    isIncoming = direction == ReferralDirection.INCOMING,
+                                    onClick = { onPatientClick(referral.patientId) },
+                                    onAccept = { viewModel.decide(referral.id, "ACCEPTED") },
+                                    onDecline = { viewModel.decide(referral.id, "DECLINED") },
+                                    onComplete = { viewModel.complete(referral.id) },
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(Spacing.xxxl)) }
+                        }
+                    }
                 }
             }
         }
     }
+
+    if (showCreate) {
+        CreateReferralDialog(
+            state = createState,
+            viewModel = viewModel,
+            onDismiss = { showCreate = false },
+        )
+    }
 }
 
 @Composable
-private fun ReferralDetailCard(
-    referral: SpecialistReferral,
+private fun ReferralCard(
+    referral: Referral,
+    isIncoming: Boolean,
     onClick: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    onComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val (statusType, statusText) = when (referral.status) {
-        ReferralStatus.PENDING -> StatusType.Pending to "Pending"
-        ReferralStatus.IN_REVIEW -> StatusType.InProgress to "In Review"
-        ReferralStatus.ACCEPTED -> StatusType.Active to "Accepted"
-        ReferralStatus.DECLINED -> StatusType.Cancelled to "Declined"
-        ReferralStatus.COMPLETED -> StatusType.Completed to "Completed"
-    }
-
-    val priorityColor = when (referral.priority) {
-        ReferralPriority.URGENT -> MaterialTheme.colorScheme.error
-        ReferralPriority.HIGH -> AppThemeColors.current.warning
-        ReferralPriority.NORMAL -> MaterialTheme.colorScheme.primary
-        ReferralPriority.LOW -> MaterialTheme.colorScheme.onSurfaceVariant
+    val partyLabel = if (isIncoming) {
+        "From ${referral.referringProviderName ?: "—"}"
+    } else {
+        "To ${referral.specialistProviderName ?: "—"}"
     }
 
     Card(
@@ -216,7 +294,7 @@ private fun ReferralDetailCard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = referral.patientName.take(1),
+                            text = (referral.patientName ?: "P").take(1),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold,
@@ -225,60 +303,46 @@ private fun ReferralDetailCard(
                     Spacer(modifier = Modifier.width(Spacing.md))
                     Column {
                         Text(
-                            text = referral.patientName,
+                            text = referral.patientName ?: "Patient ${referral.patientId}",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "${referral.patientMrn} · ${referral.patientAge}y",
+                            text = "$partyLabel · ${referral.referralNumber ?: ""}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-                StatusBadge(text = statusText, type = statusType)
+                StatusBadge(text = statusLabel(referral.status), type = statusType(referral.status))
             }
 
             Spacer(modifier = Modifier.height(Spacing.md))
 
-            // ── Referral Info ───────────────────────────────
+            // ── Specialty & priority ────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
-                    Text(
-                        text = "Referred by",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(
+                    text = referral.specialty ?: "General",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(priorityColor(referral.priority)),
                     )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
                     Text(
-                        text = referral.referringDoctor,
+                        text = referral.priorityDisplay,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = priorityColor(referral.priority),
                         fontWeight = FontWeight.Medium,
                     )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Priority",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(priorityColor),
-                        )
-                        Spacer(modifier = Modifier.width(Spacing.xs))
-                        Text(
-                            text = referral.priorityDisplay,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = priorityColor,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
                 }
             }
 
@@ -286,16 +350,16 @@ private fun ReferralDetailCard(
 
             // ── Reason ──────────────────────────────────────
             Text(
-                text = referral.referralReason,
+                text = referral.reason,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
             )
 
-            if (referral.notes != null) {
+            referral.notes?.let { notes ->
                 Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
-                    text = referral.notes,
+                    text = notes,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -303,15 +367,14 @@ private fun ReferralDetailCard(
 
             Spacer(modifier = Modifier.height(Spacing.sm))
 
-            // ── Date ────────────────────────────────────────
             Text(
-                text = "Received: ${referral.dateReceived}",
+                text = "Created: ${referral.createdAt?.take(10) ?: "—"}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // ── Action Buttons ──────────────────────────────
-            if (referral.status == ReferralStatus.PENDING || referral.status == ReferralStatus.IN_REVIEW) {
+            // ── Actions ─────────────────────────────────────
+            if (isIncoming && referral.status == "PENDING") {
                 Spacer(modifier = Modifier.height(Spacing.md))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -332,7 +395,125 @@ private fun ReferralDetailCard(
                         Text("Accept Referral")
                     }
                 }
+            } else if (isIncoming && referral.status == "ACCEPTED") {
+                Spacer(modifier = Modifier.height(Spacing.md))
+                Button(
+                    onClick = onComplete,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Spacing.sm),
+                ) {
+                    Text("Mark Completed")
+                }
             }
         }
     }
+}
+
+@Composable
+private fun CreateReferralDialog(
+    state: CreateReferralState,
+    viewModel: SpecialistDashboardViewModel,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New Referral") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                if (state.isLoadingScope) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
+                } else {
+                    Text(
+                        "Encounter (patient)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (state.selectedEncounter == null) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                            items(state.encounters, key = { it.id }) { encounter ->
+                                Text(
+                                    text = "Patient ${encounter.patientId} · ${encounter.typeDisplay}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.updateCreate {
+                                                it.copy(selectedEncounter = encounter)
+                                            }
+                                        }
+                                        .padding(vertical = Spacing.xs),
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Patient ${state.selectedEncounter!!.patientId} · ${state.selectedEncounter!!.typeDisplay}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        "Specialist",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (state.selectedSpecialist == null) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                            items(state.specialists, key = { it.id }) { specialist ->
+                                Text(
+                                    text = specialist.displayName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.updateCreate {
+                                                it.copy(selectedSpecialist = specialist)
+                                            }
+                                        }
+                                        .padding(vertical = Spacing.xs),
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            state.selectedSpecialist!!.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    OutlinedTextField(
+                        value = state.reason,
+                        onValueChange = { v -> viewModel.updateCreate { it.copy(reason = v) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Reason (min 3 characters)") },
+                        minLines = 2,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        listOf("ROUTINE", "URGENT").forEach { priority ->
+                            FilterChip(
+                                selected = state.priority == priority,
+                                onClick = { viewModel.updateCreate { it.copy(priority = priority) } },
+                                label = { Text(priority.lowercase().replaceFirstChar { c -> c.uppercase() }) },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { viewModel.createReferral() }, enabled = !state.isSaving) {
+                if (state.isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Send referral")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }

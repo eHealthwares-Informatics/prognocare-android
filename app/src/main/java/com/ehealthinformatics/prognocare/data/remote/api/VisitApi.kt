@@ -22,6 +22,7 @@ interface VisitApi {
         @Query("limit") limit: Int = 20,
         @Query("status") status: String? = null,
         @Query("providerId") providerId: String? = null,
+        @Query("patientId") patientId: String? = null,
     ): Response<PaginatedResponse<Visit>>
 
     @POST("api/visits")

@@ -34,6 +34,9 @@ class UserProfileViewModel @Inject constructor(
     private val _signOutComplete = MutableStateFlow(false)
     val signOutComplete: StateFlow<Boolean> = _signOutComplete.asStateFlow()
 
+    private val _roleSwitchedTo = MutableStateFlow<UserRole?>(null)
+    val roleSwitchedTo: StateFlow<UserRole?> = _roleSwitchedTo.asStateFlow()
+
     val appConfig: StateFlow<AppConfig> = configStore.config
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), configStore.config.value)
 
@@ -84,13 +87,13 @@ class UserProfileViewModel @Inject constructor(
         return response.body()?.data?.firstOrNull()
     }
 
-    fun saveServerConfig(emr: String, conversation: String, webChannelId: String) {
+    fun saveServerConfig(emr: String, conversation: String, webChannelCode: String) {
         viewModelScope.launch {
             configStore.updateConfig(
                 configStore.config.value.copy(
                     emrBaseUrl = emr,
                     conversationBaseUrl = conversation,
-                    webChannelId = webChannelId,
+                    webChannelCode = webChannelCode,
                 ),
             )
         }
@@ -98,6 +101,25 @@ class UserProfileViewModel @Inject constructor(
 
     fun resetServerConfig() {
         viewModelScope.launch { configStore.resetToDefaults() }
+    }
+
+    /**
+     * Demo/dev affordance: switch the active role. Persists the new role the
+     * same way login does ([SplashViewModel.saveAuthState] + [SessionStore])
+     * so the splash gate and all role-scoped queries pick it up, then signals
+     * the UI to navigate to the new role's dashboard.
+     */
+    fun switchRole(role: UserRole) {
+        val current = _state.value.profile?.role
+        if (role == current || _state.value.isSigningOut) return
+        SplashViewModel.saveAuthState(context, role)
+        SessionStore.saveRole(context, role)
+        _state.update { it.copy(profile = it.profile?.copy(role = role)) }
+        _roleSwitchedTo.value = role
+    }
+
+    fun consumeRoleSwitch() {
+        _roleSwitchedTo.value = null
     }
 
     fun signOut() {

@@ -8,9 +8,11 @@ data class Encounter(
     val patientId: String = "",
     val visitId: String? = null,
     val encounterType: String = "",
+    val status: String = "ACTIVE",
     val providerId: String? = null,
     val providerName: String? = null,
     val encounterDatetime: String? = null,
+    val endedAt: String? = null,
     val reason: String? = null,
     val notes: String? = null,
     val createdAt: String? = null,
@@ -18,6 +20,10 @@ data class Encounter(
 ) {
     val typeDisplay: String
         get() = encounterType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+
+    val isActive: Boolean get() = status == "ACTIVE"
+    val statusDisplay: String
+        get() = status.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 @Serializable
@@ -25,6 +31,7 @@ data class CreateEncounterDto(
     val patientId: String,
     val visitId: String? = null,
     val encounterType: String,
+    val status: String = "ACTIVE",
     val providerId: String? = null,
     val providerName: String? = null,
     val encounterDatetime: String? = null,
@@ -34,6 +41,8 @@ data class CreateEncounterDto(
 
 @Serializable
 data class UpdateEncounterDto(
+    val status: String? = null,
+    val endedAt: String? = null,
     val patientId: String? = null,
     val visitId: String? = null,
     val encounterType: String? = null,

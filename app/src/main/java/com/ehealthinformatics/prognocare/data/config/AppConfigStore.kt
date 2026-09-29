@@ -33,7 +33,7 @@ class AppConfigStore(private val context: Context) {
                 AppConfig(
                     emrBaseUrl = prefs[Keys.EMR_BASE_URL] ?: emrBaseUrl,
                     conversationBaseUrl = prefs[Keys.CONVERSATION_BASE_URL] ?: conversationBaseUrl,
-                    webChannelId = prefs[Keys.WEB_CHANNEL_ID] ?: webChannelId,
+                    webChannelCode = prefs[Keys.WEB_CHANNEL_CODE] ?: webChannelCode,
                 )
             }
         }
@@ -43,7 +43,7 @@ class AppConfigStore(private val context: Context) {
         context.appConfigDataStore.edit { prefs ->
             prefs[Keys.EMR_BASE_URL] = config.emrBaseUrl
             prefs[Keys.CONVERSATION_BASE_URL] = config.conversationBaseUrl
-            prefs[Keys.WEB_CHANNEL_ID] = config.webChannelId
+            prefs[Keys.WEB_CHANNEL_CODE] = config.webChannelCode
         }
     }
 
@@ -56,12 +56,12 @@ class AppConfigStore(private val context: Context) {
     private object Keys {
         val EMR_BASE_URL = stringPreferencesKey("emr_base_url")
         val CONVERSATION_BASE_URL = stringPreferencesKey("conversation_base_url")
-        val WEB_CHANNEL_ID = stringPreferencesKey("web_channel_id")
+        val WEB_CHANNEL_CODE = stringPreferencesKey("web_channel_code")
     }
 
     companion object {
         var DEFAULT_EMR_URL = BuildConfig.DEFAULT_EMR_URL
         var DEFAULT_CONVERSATION_URL = BuildConfig.DEFAULT_CONVERSATION_URL
-        var DEFAULT_WEB_CHANNEL_ID = BuildConfig.DEFAULT_WEB_CHANNEL_ID
+        var DEFAULT_WEB_CHANNEL_CODE = BuildConfig.DEFAULT_WEB_CHANNEL_CODE
     }
 }

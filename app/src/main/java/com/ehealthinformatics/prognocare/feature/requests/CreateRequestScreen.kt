@@ -1,28 +1,40 @@
 package com.ehealthinformatics.prognocare.feature.requests
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Biotech
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,13 +56,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 private val REQUEST_TYPES = listOf("LAB", "RADIOLOGY", "OTHER_TEST", "PRESCRIPTION")
 private val PRIORITIES = listOf("ROUTINE", "URGENT", "EMERGENCY")
 
-@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
+private fun typeIcon(type: String) = when (type) {
+    "LAB" -> Icons.Filled.Science
+    "RADIOLOGY" -> Icons.Filled.Biotech
+    "PRESCRIPTION" -> Icons.Filled.Medication
+    else -> Icons.Filled.MonitorHeart
+}
+
+@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun CreateRequestScreen(
     patientId: String? = null,
@@ -67,13 +85,6 @@ fun CreateRequestScreen(
                 is RequestUiEvent.Success -> onSaved()
                 is RequestUiEvent.Error -> Unit // error text shown inline below
             }
-        }
-    }
-
-    // Pre-select a patient passed from another screen.
-    LaunchedEffect(patientId) {
-        if (patientId != null && state.selectedPatient == null) {
-            viewModel.update { it.copy(selectedPatient = null) }
         }
     }
 
@@ -107,7 +118,7 @@ fun CreateRequestScreen(
                 .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            // ── Patient ──────────────────────────────────────
+            // ── Scope: Patient / Visit / Encounter ────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Spacing.base),
@@ -115,49 +126,25 @@ fun CreateRequestScreen(
             ) {
                 Column(modifier = Modifier.padding(Spacing.base)) {
                     Text(
-                        text = "Patient",
+                        text = "Request for",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    if (state.selectedPatient != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "${state.selectedPatient!!.displayName} (${state.selectedPatient!!.patientId})",
-                                style = MaterialTheme.typography.bodyMedium,
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        RequestScope.entries.forEach { scope ->
+                            FilterChip(
+                                selected = state.scope == scope,
+                                onClick = { viewModel.setScope(scope) },
+                                label = { Text(scope.label) },
                             )
-                            IconButton(onClick = { viewModel.update { it.copy(selectedPatient = null) } }) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear")
-                            }
                         }
-                    } else {
-                        OutlinedTextField(
-                            value = patientSearch,
-                            onValueChange = { patientSearch = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Search patient by name or MRN") },
-                            singleLine = true,
-                        )
-                        state.patientResults.forEach { patient ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = Spacing.xs),
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.selectPatient(patient)
-                                        patientSearch = ""
-                                    },
-                                ) {
-                                    Text("${patient.displayName} · ${patient.patientId}")
-                                }
-                            }
-                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    when (state.scope) {
+                        RequestScope.PATIENT -> PatientScopePicker(viewModel, state, patientSearch)
+                        RequestScope.VISIT -> VisitScopePicker(viewModel, state)
+                        RequestScope.ENCOUNTER -> EncounterScopePicker(viewModel, state)
                     }
                 }
             }
@@ -175,11 +162,20 @@ fun CreateRequestScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(modifier = Modifier.height(Spacing.xs))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    // FlowRow so the chips wrap to the next line instead of
+                    // overflowing off-screen.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         REQUEST_TYPES.forEach { type ->
                             FilterChip(
                                 selected = state.requestType == type,
                                 onClick = { viewModel.update { it.copy(requestType = type) } },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = typeIcon(type),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
                                 label = {
                                     Text(type.replace("_", " ").lowercase().replaceFirstChar { c -> c.uppercase() })
                                 },
@@ -193,7 +189,7 @@ fun CreateRequestScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(modifier = Modifier.height(Spacing.xs))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         PRIORITIES.forEach { priority ->
                             FilterChip(
                                 selected = state.priority == priority,
@@ -308,8 +304,113 @@ fun CreateRequestScreen(
                     .height(52.dp),
                 enabled = !state.isSaving,
             ) {
+                if (state.isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(modifier = Modifier.size(Spacing.sm))
+                }
                 Text(if (state.isSaving) "Saving…" else "Create request")
             }
+        }
+    }
+}
+
+/** Patient scope: free search; patients covered by a visit/encounter are hidden. */
+@Composable
+private fun PatientScopePicker(
+    viewModel: CreateRequestViewModel,
+    state: CreateRequestState,
+    patientSearch: String,
+) {
+    if (state.selectedPatient != null) {
+        ListItem(
+            headlineContent = {
+                Text("${state.selectedPatient!!.displayName} (${state.selectedPatient!!.patientId})")
+            },
+            trailingContent = {
+                IconButton(onClick = { viewModel.clearSelection() }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                }
+            },
+        )
+    } else {
+        OutlinedTextField(
+            value = patientSearch,
+            onValueChange = { viewModel.searchPatients(it) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Search patient by name or MRN") },
+            singleLine = true,
+        )
+        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp)) {
+            items(state.patientResults) { patient ->
+                ListItem(
+                    headlineContent = { Text("${patient.displayName} · ${patient.patientId}") },
+                    modifier = Modifier.clickable { viewModel.selectPatient(patient) },
+                )
+            }
+        }
+    }
+}
+
+/** Visit scope: ongoing visits, one per patient. */
+@Composable
+private fun VisitScopePicker(
+    viewModel: CreateRequestViewModel,
+    state: CreateRequestState,
+) {
+    if (state.visits.isEmpty() && !state.isLoadingScope) {
+        Text(
+            "No patients with open visits",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+        items(state.visits, key = { it.id }) { visit ->
+            ListItem(
+                headlineContent = { Text(visit.patientName.ifBlank { "Patient ${visit.patientId}" }) },
+                supportingContent = { Text(visit.typeDisplay) },
+                trailingContent = {
+                    if (state.selectedVisit?.id == visit.id) {
+                        Icon(Icons.Default.Check, contentDescription = "Selected")
+                    }
+                },
+                modifier = Modifier.clickable { viewModel.selectVisit(visit) },
+            )
+        }
+    }
+}
+
+/** Encounter scope: active encounters, one per patient. */
+@Composable
+private fun EncounterScopePicker(
+    viewModel: CreateRequestViewModel,
+    state: CreateRequestState,
+) {
+    if (state.encounters.isEmpty() && !state.isLoadingScope) {
+        Text(
+            "No active encounters",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+        items(state.encounters, key = { it.id }) { encounter ->
+            ListItem(
+                headlineContent = {
+                    Text("Patient ${encounter.patientId} · ${encounter.typeDisplay}")
+                },
+                supportingContent = { Text(encounter.encounterDatetime?.take(10) ?: "") },
+                trailingContent = {
+                    if (state.selectedEncounter?.id == encounter.id) {
+                        Icon(Icons.Default.Check, contentDescription = "Selected")
+                    }
+                },
+                modifier = Modifier.clickable { viewModel.selectEncounter(encounter) },
+            )
         }
     }
 }

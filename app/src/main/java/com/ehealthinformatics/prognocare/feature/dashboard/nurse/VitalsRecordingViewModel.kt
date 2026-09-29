@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.FormDefinition
 import com.ehealthinformatics.prognocare.data.remote.models.Patient
+import com.ehealthinformatics.prognocare.feature.forms.SchemaKeyMapper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,9 +19,17 @@ data class VitalsSetupState(
     val error: String? = null,
 )
 
+sealed class VitalsSaveResult {
+    data object Success : VitalsSaveResult()
+    data class Failure(val message: String) : VitalsSaveResult()
+}
+
 /**
  * Resolves the published VITALS form (code match) so the vitals recording
- * screen can hand off into the dynamic-form renderer with the right context.
+ * screen can submit into it, and submits values keyed by clinical concept —
+ * they are mapped onto the form definition's actual field keys
+ * ([SchemaKeyMapper]) so the payload always matches the schema the server
+ * validates against.
  */
 @HiltViewModel
 class VitalsRecordingViewModel @Inject constructor(
@@ -34,7 +43,7 @@ class VitalsRecordingViewModel @Inject constructor(
         load()
     }
 
-    /** Debounced-less simple patient search used by the patient picker. */
+    /** Debounce-less simple patient search used by the patient picker. */
     fun searchPatients(query: String, onResult: (List<Patient>) -> Unit) {
         if (query.isBlank()) return
         viewModelScope.launch {
@@ -52,24 +61,42 @@ class VitalsRecordingViewModel @Inject constructor(
     }
 
     /**
-     * Submits vitals values into the VITALS form definition. Field keys are
-     * best-effort (backend seed schema); unknown keys are ignored server-side.
+     * Submits vitals as a VITALS form submission. [raw] is keyed by clinical
+     * concept (e.g. "bpSystolic", "oxygenSaturation"); the schema mapper
+     * translates them into whatever keys this facility's VITALS form uses.
+     * Returns the server's real error text on failure so the message is
+     * actionable instead of a generic "check the form keys".
      */
-    suspend fun submitVitals(formId: String, patientId: String, data: Map<String, Any?>): Boolean {
+    suspend fun submitVitals(
+        form: FormDefinition,
+        patientId: String,
+        raw: Map<String, Any?>,
+    ): VitalsSaveResult {
         return runCatching {
+            val payload = SchemaKeyMapper.map(form.schemaJson, raw)
+            if (payload.isEmpty()) {
+                return@runCatching VitalsSaveResult.Failure(
+                    "the VITALS form schema has no recognizable fields — check the form definition",
+                )
+            }
             val response = retrofitClient.apis.value.formApi.createSubmission(
                 com.ehealthinformatics.prognocare.data.remote.models.CreateFormSubmissionDto(
-                    formDefinitionId = formId,
+                    formDefinitionId = form.id,
                     patientId = patientId,
-                    dataJson = kotlinx.serialization.json.Json.encodeToJsonElement(
-                        kotlinx.serialization.serializer<Map<String, Any?>>(),
-                        data,
-                    ),
+                    dataJson = payload,
                     status = "SUBMITTED",
                 ),
             )
-            response.isSuccessful
-        }.getOrDefault(false)
+            if (response.isSuccessful) {
+                VitalsSaveResult.Success
+            } else {
+                val detail = runCatching { response.errorBody()?.string() }.getOrNull()
+                    ?.lineSequence()?.firstOrNull()?.take(220)
+                VitalsSaveResult.Failure(detail ?: "${response.code()} ${response.message()}")
+            }
+        }.getOrElse {
+            VitalsSaveResult.Failure(it.message ?: "unexpected error")
+        }
     }
 
     fun load() {

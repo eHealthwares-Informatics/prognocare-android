@@ -4,7 +4,7 @@ import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.data.config.conversationSocketUrl
 import com.ehealthinformatics.prognocare.data.config.withConversationBaseUrl
 import com.ehealthinformatics.prognocare.data.config.withEmrBaseUrl
-import com.ehealthinformatics.prognocare.data.config.withWebChannelId
+import com.ehealthinformatics.prognocare.data.config.withWebChannelCode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -13,7 +13,7 @@ class AppConfigTest {
     private val config = AppConfig(
         emrBaseUrl = "http://10.0.2.2:8093/",
         conversationBaseUrl = "http://10.0.2.2:8090/api",
-        webChannelId = "69bd061c11bf835d976c4e2f",
+        webChannelCode = "PROGNOCARE_MESSAGING",
     )
 
     @Test
@@ -58,8 +58,8 @@ class AppConfigTest {
     }
 
     @Test
-    fun `empty web channel id keeps previous value`() {
-        val updated = config.withWebChannelId("  ")
-        assertEquals(config.webChannelId, updated.webChannelId)
+    fun `empty web channel code keeps previous value`() {
+        val updated = config.withWebChannelCode("  ")
+        assertEquals(config.webChannelCode, updated.webChannelCode)
     }
 }

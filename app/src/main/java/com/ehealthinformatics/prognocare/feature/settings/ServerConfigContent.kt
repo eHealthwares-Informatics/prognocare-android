@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -44,7 +42,7 @@ import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 @Composable
 fun ServerConfigContent(
     config: AppConfig,
-    onSave: (emrBaseUrl: String, conversationBaseUrl: String, webChannelId: String) -> Unit,
+    onSave: (emrBaseUrl: String, conversationBaseUrl: String, webChannelCode: String) -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
     isVerifying: Boolean = false,
@@ -52,7 +50,7 @@ fun ServerConfigContent(
 ) {
     var emrUrl by rememberSaveable { mutableStateOf(config.emrBaseUrl) }
     var conversationUrl by rememberSaveable { mutableStateOf(config.conversationBaseUrl) }
-    var channelId by rememberSaveable { mutableStateOf(config.webChannelId) }
+    var channelCode by rememberSaveable { mutableStateOf(config.webChannelCode) }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -63,7 +61,6 @@ fun ServerConfigContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .padding(Spacing.base),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
@@ -105,10 +102,10 @@ fun ServerConfigContent(
             )
 
             OutlinedTextField(
-                value = channelId,
-                onValueChange = { channelId = it },
+                value = channelCode,
+                onValueChange = { channelCode = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Web channel ID") },
+                label = { Text("Messaging channel code") },
                 singleLine = true,
                 shape = RoundedCornerShape(Spacing.md),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -122,7 +119,7 @@ fun ServerConfigContent(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Button(
-                    onClick = { onSave(emrUrl, conversationUrl, channelId) },
+                    onClick = { onSave(emrUrl, conversationUrl, channelCode) },
                     modifier = Modifier.weight(1f),
                     enabled = !isVerifying,
                     shape = RoundedCornerShape(Spacing.md),

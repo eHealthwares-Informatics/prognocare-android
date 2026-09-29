@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +56,7 @@ import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 @Composable
 fun ConversationListScreen(
     onConversationClick: (String) -> Unit,
+    onNewConversation: () -> Unit = {},
     onBack: () -> Unit,
     viewModel: ConversationListViewModel = hiltViewModel(),
 ) {
@@ -89,6 +91,19 @@ fun ConversationListScreen(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
+        },
+        floatingActionButton = {
+            androidx.compose.material3.ExtendedFloatingActionButton(
+                onClick = onNewConversation,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                androidx.compose.material3.Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                )
+                androidx.compose.material3.Text("New conversation")
+            }
         },
     ) { innerPadding ->
         Column(

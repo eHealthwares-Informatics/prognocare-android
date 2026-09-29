@@ -83,6 +83,14 @@ class LoginViewModel @Inject constructor(
             val staff = response.body()?.data?.firstOrNull()
             if (staff != null) {
                 SessionStore.saveStaff(context, staff.id, staff.displayName)
+                // Seed the location scope with the staff record's location so
+                // list queries are location-based from the first launch.
+                staff.identityLocationId?.let { SessionStore.saveStaffLocationId(context, it) }
+                // Seed the chat identity with the staff phone so messaging
+                // routes to a stable participant (replies arrive per-phone).
+                staff.phone?.takeIf { it.isNotBlank() }?.let {
+                    com.ehealthinformatics.prognocare.feature.chat.ChatIdentity.savePhone(context, it)
+                }
             }
         }
     }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -38,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,13 +76,16 @@ import com.ehealthinformatics.prognocare.designsystem.theme.ThemeViewModel
 import com.ehealthinformatics.prognocare.designsystem.theme.ThemeSettingsScreen
 import com.ehealthinformatics.prognocare.feature.settings.ServerConfigContent
 import com.ehealthinformatics.prognocare.feature.settings.TapCounter
+import com.ehealthinformatics.prognocare.navigation.UserRole
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun UserProfileScreen(
     onBack: () -> Unit,
     onSignOut: () -> Unit,
     onOpenServerSettings: () -> Unit = {},
+    onRoleChanged: (UserRole) -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel(),
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
@@ -97,6 +103,16 @@ fun UserProfileScreen(
     LaunchedEffect(signOutComplete) {
         if (signOutComplete) {
             onSignOut()
+        }
+    }
+
+    // Navigate to the new role's dashboard after a role switch.
+    LaunchedEffect(Unit) {
+        viewModel.roleSwitchedTo.collect { role ->
+            if (role != null) {
+                viewModel.consumeRoleSwitch()
+                onRoleChanged(role)
+            }
         }
     }
 
@@ -253,6 +269,67 @@ fun UserProfileScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                // ── Role Switch ────────────────────────────────
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                        shape = RoundedCornerShape(Spacing.base),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(Spacing.base),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(AppThemeColors.current.kpiOrangeLight),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.ManageAccounts,
+                                        contentDescription = null,
+                                        tint = AppThemeColors.current.kpiOrange,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(Spacing.md))
+                                Column {
+                                    Text(
+                                        text = "Active role",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Text(
+                                        text = "Switch dashboards without signing out",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(Spacing.md))
+
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                                UserRole.entries.forEach { role ->
+                                    FilterChip(
+                                        selected = role == profile.role,
+                                        onClick = { viewModel.switchRole(role) },
+                                        label = { Text(role.displayName) },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -717,7 +794,7 @@ fun UserProfileScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Text(
-                                        text = "Web channel: ${appConfig.webChannelId}",
+                                        text = "Channel: ${appConfig.webChannelCode}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )

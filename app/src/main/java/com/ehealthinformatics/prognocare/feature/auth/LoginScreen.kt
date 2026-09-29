@@ -94,8 +94,8 @@ fun LoginScreen(
     val saveResult by settingsViewModel.saveResult.collectAsState()
     var loginError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(loginViewModel.state) {
-        when (val s = loginViewModel.state.value) {
+    LaunchedEffect(isLoading) {
+        when (val s = isLoading) {
             is LoginState.Success -> {
                 onLoginSuccess(s.role)
                 loginViewModel.reset()
@@ -524,7 +524,7 @@ fun LoginScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                text = "Web channel: ${config.webChannelId}",
+                                text = "Channel: ${config.webChannelCode}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

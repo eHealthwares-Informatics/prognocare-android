@@ -8,7 +8,7 @@ import com.ehealthinformatics.prognocare.data.config.ConnectionCheck
 import com.ehealthinformatics.prognocare.data.config.ServerConfigVerifier
 import com.ehealthinformatics.prognocare.data.config.withConversationBaseUrl
 import com.ehealthinformatics.prognocare.data.config.withEmrBaseUrl
-import com.ehealthinformatics.prognocare.data.config.withWebChannelId
+import com.ehealthinformatics.prognocare.data.config.withWebChannelCode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,7 +41,7 @@ class SettingsViewModel @Inject constructor(
     fun saveConfig(
         emrBaseUrl: String,
         conversationBaseUrl: String,
-        webChannelId: String,
+        webChannelCode: String,
     ) {
         viewModelScope.launch {
             _isVerifying.value = true
@@ -51,7 +51,7 @@ class SettingsViewModel @Inject constructor(
                 val candidate = current
                     .withEmrBaseUrl(emrBaseUrl)
                     .withConversationBaseUrl(conversationBaseUrl)
-                    .withWebChannelId(webChannelId)
+                    .withWebChannelCode(webChannelCode)
 
                 val checks = verifier.verify(candidate)
                 val allOk = checks.all { it is ConnectionCheck.Success }

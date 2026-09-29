@@ -178,7 +178,12 @@ private fun FieldList(
     onRemoveRow: (FormField, Int) -> Unit,
     onRowValue: (FormField, Int, String, Any?) -> Unit,
 ) {
-    fields.forEach { field ->
+    // Column arrangement: consecutive simple fields (text/number/select/etc.)
+    // are chunked into two-per-row rows; structural fields (sections, tabs,
+    // columns, tables, textareas) always get the full width.
+    var index = 0
+    while (index < fields.size) {
+        val field = fields[index]
         when (field.type) {
             FormFieldType.SECTION -> {
                 HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
@@ -189,16 +194,20 @@ private fun FieldList(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(Spacing.sm))
+                index += 1
             }
-            FormFieldType.TAB -> TabFieldList(
-                field = field,
-                data = data,
-                enabled = enabled,
-                onValueChange = onValueChange,
-                onAddRow = onAddRow,
-                onRemoveRow = onRemoveRow,
-                onRowValue = onRowValue,
-            )
+            FormFieldType.TAB -> {
+                TabFieldList(
+                    field = field,
+                    data = data,
+                    enabled = enabled,
+                    onValueChange = onValueChange,
+                    onAddRow = onAddRow,
+                    onRemoveRow = onRemoveRow,
+                    onRowValue = onRowValue,
+                )
+                index += 1
+            }
             FormFieldType.COL -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     field.fields.forEach { child ->
@@ -213,24 +222,90 @@ private fun FieldList(
                     }
                 }
                 Spacer(Modifier.height(Spacing.md))
+                index += 1
             }
-            FormFieldType.TABLE -> TableField(
-                field = field,
-                rows = data[field.key] as? List<*> ?: emptyList<Any>(),
-                enabled = enabled,
-                onAddRow = { onAddRow(field) },
-                onRemoveRow = { idx -> onRemoveRow(field, idx) },
-                onCellValue = { r, c, v -> onRowValue(field, r, c, v) },
-            )
-            else -> {
-                SingleField(
+            FormFieldType.TABLE, FormFieldType.TEXTAREA -> {
+                TableOrTextarea(
                     field = field,
-                    value = data[field.key],
+                    data = data,
                     enabled = enabled,
-                    onValueChange = { onValueChange(field.key, it) },
+                    onValueChange = onValueChange,
+                    onAddRow = onAddRow,
+                    onRemoveRow = onRemoveRow,
+                    onRowValue = onRowValue,
                 )
-                Spacer(Modifier.height(Spacing.md))
+                index += 1
             }
+            else -> {
+                // Pair consecutive simple fields into a 2-column row.
+                val isSimple: (FormField) -> Boolean = {
+                    it.type != FormFieldType.SECTION &&
+                        it.type != FormFieldType.TAB &&
+                        it.type != FormFieldType.COL &&
+                        it.type != FormFieldType.TABLE &&
+                        it.type != FormFieldType.TEXTAREA
+                }
+                val pair = buildList {
+                    add(field)
+                    var next = index + 1
+                    while (next < fields.size && size < 2 && isSimple(fields[next])) {
+                        add(fields[next])
+                        next += 1
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    pair.forEach { f ->
+                        Column(Modifier.weight(1f)) {
+                            TableOrTextarea(
+                                field = f,
+                                data = data,
+                                enabled = enabled,
+                                onValueChange = onValueChange,
+                                onAddRow = onAddRow,
+                                onRemoveRow = onRemoveRow,
+                                onRowValue = onRowValue,
+                            )
+                        }
+                    }
+                    // Keep widths stable when a row has only one field.
+                    if (pair.size == 1) {
+                        androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {}
+                    }
+                }
+                Spacer(Modifier.height(Spacing.md))
+                index += pair.size
+            }
+        }
+    }
+}
+
+@Composable
+private fun TableOrTextarea(
+    field: FormField,
+    data: FormData,
+    enabled: Boolean,
+    onValueChange: (String, Any?) -> Unit,
+    onAddRow: (FormField) -> Unit,
+    onRemoveRow: (FormField, Int) -> Unit,
+    onRowValue: (FormField, Int, String, Any?) -> Unit,
+) {
+    when (field.type) {
+        FormFieldType.TABLE -> TableField(
+            field = field,
+            rows = data[field.key] as? List<*> ?: emptyList<Any>(),
+            enabled = enabled,
+            onAddRow = { onAddRow(field) },
+            onRemoveRow = { idx -> onRemoveRow(field, idx) },
+            onCellValue = { r, c, v -> onRowValue(field, r, c, v) },
+        )
+        else -> {
+            SingleField(
+                field = field,
+                value = data[field.key],
+                enabled = enabled,
+                onValueChange = { onValueChange(field.key, it) },
+            )
+            Spacer(Modifier.height(Spacing.md))
         }
     }
 }

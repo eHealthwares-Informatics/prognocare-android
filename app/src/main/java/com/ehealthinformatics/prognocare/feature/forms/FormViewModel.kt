@@ -41,6 +41,9 @@ class FormViewModel @Inject constructor(
     private val _available = MutableStateFlow<List<FormDefinition>>(emptyList())
     val available: StateFlow<List<FormDefinition>> = _available.asStateFlow()
 
+    private val _loadingAvailable = MutableStateFlow(false)
+    val loadingAvailable: StateFlow<Boolean> = _loadingAvailable.asStateFlow()
+
     private val _loadError = MutableStateFlow<String?>(null)
     val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
@@ -56,17 +59,22 @@ class FormViewModel @Inject constructor(
     fun loadAvailable() {
         viewModelScope.launch {
             _loadError.value = null
-            runCatching { retrofitClient.apis.value.formApi.availableForms() }
-                .onSuccess { resp ->
-                    if (resp.isSuccessful && resp.body() != null) {
-                        _available.value = resp.body()!!.data
-                    } else {
-                        _loadError.value = "Could not load forms (${resp.code()})"
+            _loadingAvailable.value = true
+            try {
+                runCatching { retrofitClient.apis.value.formApi.availableForms() }
+                    .onSuccess { resp ->
+                        if (resp.isSuccessful && resp.body() != null) {
+                            _available.value = resp.body()!!.data
+                        } else {
+                            _loadError.value = "Could not load forms (${resp.code()})"
+                        }
                     }
-                }
-                .onFailure { e ->
-                    _loadError.value = e.message ?: "Could not load forms"
-                }
+                    .onFailure { e ->
+                        _loadError.value = e.message ?: "Could not load forms"
+                    }
+            } finally {
+                _loadingAvailable.value = false
+            }
         }
     }
 
@@ -143,20 +151,32 @@ class FormViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val api = retrofitClient.apis.value.formApi
+                // Resolve the value bag onto the schema's real field keys via
+                // SchemaKeyMapper.remap — exact keys win, then normalized and
+                // concept-alias matches; unknown and null entries are dropped.
+                val jsonElements = s.data.mapValues { (_, value) -> toJsonElement(value) }
+                val payload = SchemaKeyMapper.remap(s.formDefinition.schemaJson, jsonElements)
                 val resp = api.createSubmission(
                     CreateFormSubmissionDto(
                         formDefinitionId = s.formDefinition.id,
                         patientId = patientId,
                         visitId = visitId,
                         encounterId = encounterId,
-                        dataJson = toJsonElement(s.data),
+                        dataJson = payload,
                         status = "SUBMITTED",
                     ),
                 )
                 if (resp.isSuccessful && resp.body() != null) {
                     _state.value = FormUiState.Submitted(resp.body()!!)
                 } else {
-                    _state.value = s.copy(submitting = false, errors = listOf("Submit failed (${resp.code()})"))
+                    // Surface the server's validation message, not just the code.
+                    val detail = runCatching { resp.errorBody()?.string() }
+                        .getOrNull()
+                        ?.lineSequence()?.firstOrNull()?.take(300)
+                    _state.value = s.copy(
+                        submitting = false,
+                        errors = listOf(detail ?: "Submit failed (${resp.code()})"),
+                    )
                 }
             } catch (e: Exception) {
                 _state.value = s.copy(submitting = false, errors = listOf("Network error: ${e.message}"))

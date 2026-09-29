@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.remote.models.ConversationInboxItem
 import com.ehealthinformatics.prognocare.data.remote.models.ExchangeMessage
+import com.ehealthinformatics.prognocare.navigation.ChatRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,10 +67,31 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Send through the engine webhook. A null conversation id starts a fresh
+     * conversation (newConversation=true, mirroring the web widget) — used by
+     * the "New conversation" screen and after an engine-ended thread.
+     */
     fun sendMessage(conversationId: String?, text: String) {
         viewModelScope.launch {
+            val startingFresh = conversationId == null ||
+                conversationId == ChatRoutes.NEW_CONVERSATION_ID
             val senderPhone = repository.senderPhone()
-            repository.sendText(conversationId, senderPhone, text)
+            runCatching {
+                repository.sendText(
+                    conversationId = conversationId?.takeIf { it != ChatRoutes.NEW_CONVERSATION_ID },
+                    senderPhone = senderPhone,
+                    text = text,
+                    newConversation = startingFresh,
+                )
+            }.onFailure { e ->
+                android.util.Log.e("ChatViewModel", "send failed", e)
+            }
+            // The webhook reply is async; the user's own message lands in the
+            // transcript shortly after — pull it so the send is visible.
+            conversationId
+                ?.takeIf { it != ChatRoutes.NEW_CONVERSATION_ID }
+                ?.let { repository.loadMessages(it) }
         }
     }
 }

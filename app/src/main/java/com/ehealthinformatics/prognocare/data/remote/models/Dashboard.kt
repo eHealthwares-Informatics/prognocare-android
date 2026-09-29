@@ -29,6 +29,12 @@ data class DashboardMetrics(
     val pendingRequests: Int = 0,
 )
 
+/** Response of GET /api/dashboard/attended-patients. */
+@Serializable
+data class AttendedPatientsResponse(
+    val count: Int = 0,
+)
+
 @Serializable
 data class ProviderLoad(
     val providerId: String = "",

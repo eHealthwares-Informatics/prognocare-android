@@ -119,7 +119,7 @@ class ChatApiContractTest {
 
         val response = api.sendWebhook(
             SendWebhookDto(
-                channelId = "69bd061c11bf835d976c4e2f",
+                channelCode = "PROGNOCARE_MESSAGING",
                 senderPhone = "+2348000000001",
                 text = "1: Yes",
                 conversationId = "conv-1",
@@ -131,7 +131,7 @@ class ChatApiContractTest {
         assertEquals("/api/webhooks/web", request.path)
         assertEquals("POST", request.method)
         val body = request.body.readUtf8()
-        assertTrue(body.contains("69bd061c11bf835d976c4e2f"))
+        assertTrue(body.contains("PROGNOCARE_MESSAGING"))
         assertTrue(body.contains("+2348000000001"))
     }
 

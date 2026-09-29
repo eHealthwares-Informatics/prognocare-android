@@ -36,7 +36,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,19 +61,26 @@ import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(
     onNavigateToPatientSearch: () -> Unit,
+    onNavigateToRegisterPatient: () -> Unit = {},
     onNavigateToCheckIn: () -> Unit,
     onNavigateToStaff: () -> Unit,
     onNavigateToChat: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToAppointments: () -> Unit = {},
     viewModel: AdminDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
 
     Scaffold { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.retry() },
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -293,7 +302,7 @@ fun AdminDashboardScreen(
                             label = "Register\nPatient",
                             iconTint = AppThemeColors.current.kpiBlue,
                             iconBg = AppThemeColors.current.kpiBlueLight,
-                            onClick = { /* register patient */ },
+                            onClick = onNavigateToRegisterPatient,
                             modifier = Modifier.weight(1f),
                         )
                         DashboardQuickAction(
@@ -317,7 +326,7 @@ fun AdminDashboardScreen(
                             label = "View\nReports",
                             iconTint = AppThemeColors.current.kpiOrange,
                             iconBg = AppThemeColors.current.kpiOrangeLight,
-                            onClick = { /* reports */ },
+                            onClick = onNavigateToAppointments,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -346,6 +355,7 @@ fun AdminDashboardScreen(
             }
 
             item { Spacer(modifier = Modifier.height(Spacing.xxl)) }
+        }
         }
     }
 }

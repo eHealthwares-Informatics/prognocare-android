@@ -7,10 +7,12 @@ import com.ehealthinformatics.prognocare.data.remote.api.EncounterApi
 import com.ehealthinformatics.prognocare.data.remote.api.FormApi
 import com.ehealthinformatics.prognocare.data.remote.api.HealthApi
 import com.ehealthinformatics.prognocare.data.remote.api.LocationApi
+import com.ehealthinformatics.prognocare.data.remote.api.MedicationApi
 import com.ehealthinformatics.prognocare.data.remote.api.PatientApi
 import com.ehealthinformatics.prognocare.data.remote.api.PaymentProviderApi
 import com.ehealthinformatics.prognocare.data.remote.api.RequestApi
 import com.ehealthinformatics.prognocare.data.remote.api.StaffApi
+import com.ehealthinformatics.prognocare.data.remote.api.ReferralApi
 import com.ehealthinformatics.prognocare.data.remote.api.VisitApi
 import com.ehealthinformatics.prognocare.data.remote.api.AuthApi
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +48,8 @@ data class ApiBundle(
     val locationApi: LocationApi,
     val healthApi: HealthApi,
     val authApi: AuthApi,
+    val referralApi: ReferralApi,
+    val medicationApi: MedicationApi,
 )
 
 @Singleton
@@ -59,6 +63,9 @@ class RetrofitClient @Inject constructor(
         ignoreUnknownKeys = true
         encodeDefaults = true
         isLenient = true
+        // Never send explicit nulls: the EMR uses strict whitelist validation
+        // and rejects unknown properties like items[].id/requestId.
+        explicitNulls = false
     }
 
     private fun buildHttpClient(): OkHttpClient = OkHttpClient.Builder()
@@ -94,6 +101,8 @@ class RetrofitClient @Inject constructor(
             locationApi = retrofit.create(LocationApi::class.java),
             healthApi = retrofit.create(HealthApi::class.java),
             authApi = retrofit.create(AuthApi::class.java),
+            referralApi = retrofit.create(ReferralApi::class.java),
+            medicationApi = retrofit.create(MedicationApi::class.java),
         )
     }
 

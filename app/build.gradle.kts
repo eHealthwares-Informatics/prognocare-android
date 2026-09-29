@@ -32,8 +32,8 @@ android {
         )
         buildConfigField(
             "String",
-            "DEFAULT_WEB_CHANNEL_ID",
-            "\"69bd061c11bf835d976c4e2f\""
+            "DEFAULT_WEB_CHANNEL_CODE",
+            "\"PROGNOCARE_MESSAGING\""
         )
     }
 

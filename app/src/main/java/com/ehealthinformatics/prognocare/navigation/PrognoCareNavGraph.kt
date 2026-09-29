@@ -80,6 +80,12 @@ import com.ehealthinformatics.prognocare.feature.auth.LoginScreen
 import com.ehealthinformatics.prognocare.feature.chat.ChatNotificationViewModel
 import com.ehealthinformatics.prognocare.feature.chat.ChatScreen
 import com.ehealthinformatics.prognocare.feature.chat.ConversationListScreen
+import com.ehealthinformatics.prognocare.feature.clinical.ClinicalAppointmentsScreen
+import com.ehealthinformatics.prognocare.feature.clinical.ClinicalEncountersScreen
+import com.ehealthinformatics.prognocare.feature.clinical.ClinicalVisitsScreen
+import com.ehealthinformatics.prognocare.feature.clinical.CreateAppointmentDialog
+import com.ehealthinformatics.prognocare.feature.clinical.CreateEncounterDialog
+import com.ehealthinformatics.prognocare.feature.clinical.CreateVisitDialog
 import com.ehealthinformatics.prognocare.feature.forms.DynamicFormScreen
 import com.ehealthinformatics.prognocare.feature.forms.FormPickerScreen
 import com.ehealthinformatics.prognocare.feature.requests.CreateRequestScreen
@@ -353,6 +359,11 @@ fun PrognoCareNavGraph(
                     onNavigateToPatientDetail = { id -> navController.navigate(DoctorRoutes.patientDetail(id)) },
                     onNavigateToChat = { navController.navigate(ChatRoutes.CONVERSATIONS) },
                     onNavigateToProfile = { navController.navigate(ProfileRoutes.PROFILE) },
+                    onNavigateToEncounters = { navController.navigate(ClinicalRoutes.ENCOUNTERS + "/new") },
+                    onNavigateToNewRequest = { navController.navigate(DoctorRoutes.CREATE_REQUEST) },
+                    onNavigateToClinicalNote = {
+                        navController.navigate(FormsRoutes.picker())
+                    },
                 )
             }
 
@@ -392,9 +403,19 @@ fun PrognoCareNavGraph(
                 DoctorEncounterScreen(
                     encounterId = encounterId,
                     onBack = { navController.popBackStack() },
-                    onAddNote = { /* TODO: show add note dialog */ },
-                    onAddDiagnosis = { /* TODO: show add diagnosis dialog */ },
-                    onComplete = { navController.popBackStack() },
+                    onOpenFormPicker = { patientId, visitId, encId ->
+                        navController.navigate(FormsRoutes.picker(patientId, visitId, encId))
+                    },
+                    onEditSubmission = { patientId, visitId, encId, submissionId ->
+                        navController.navigate(
+                            FormsRoutes.form(
+                                formId = "",
+                                patientId = patientId,
+                                visitId = visitId,
+                                encounterId = encId,
+                            ),
+                        )
+                    },
                 )
             }
 
@@ -429,6 +450,9 @@ fun PrognoCareNavGraph(
             composable(ChatRoutes.CONVERSATIONS) {
                 ConversationListScreen(
                     onConversationClick = { id -> navController.navigate(ChatRoutes.conversationDetail(id)) },
+                    onNewConversation = {
+                        navController.navigate(ChatRoutes.conversationDetail(ChatRoutes.NEW_CONVERSATION_ID))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -460,9 +484,14 @@ fun PrognoCareNavGraph(
                     patientId = patientId,
                     visitId = visitId,
                     encounterId = encounterId,
-                    onPick = { formId ->
+                    onPick = { formId, pickedPatientId, pickedVisitId, pickedEncounterId ->
                         navController.navigate(
-                            FormsRoutes.form(formId, patientId.ifEmpty { null }, visitId, encounterId),
+                            FormsRoutes.form(
+                                formId,
+                                pickedPatientId,
+                                pickedVisitId,
+                                pickedEncounterId,
+                            ),
                         )
                     },
                     onBack = { navController.popBackStack() },
@@ -520,6 +549,29 @@ fun PrognoCareNavGraph(
 
             composable(NurseRoutes.CHECKIN) {
                 NurseCheckInScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // Nurse patient list + detail: shared search list and the shared
+            // tabbed patient profile (the bottom-nav Patients item was dead).
+            composable(NurseRoutes.PATIENT_LIST) {
+                com.ehealthinformatics.prognocare.feature.shared.PatientSearchScreen(
+                    title = "Patients",
+                    onBack = { navController.popBackStack() },
+                    onPatientClick = { patient ->
+                        navController.navigate("nurse/patients/${patient.patientId.ifBlank { patient.id }}")
+                    },
+                )
+            }
+
+            composable(
+                route = "nurse/patients/{patientId}",
+                arguments = listOf(navArgument("patientId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
+                com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPatientDetailScreen(
+                    patientId = patientId,
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -593,8 +645,6 @@ fun PrognoCareNavGraph(
                 SpecialistReferralDetailScreen(
                     referralId = referralId,
                     onBack = { navController.popBackStack() },
-                    onAccept = { navController.popBackStack() },
-                    onReject = { navController.popBackStack() },
                 )
             }
 
@@ -603,8 +653,10 @@ fun PrognoCareNavGraph(
                     patientId = "",
                     visitId = null,
                     encounterId = null,
-                    onPick = { formId ->
-                        navController.navigate(FormsRoutes.form(formId))
+                    onPick = { formId, pickedPatientId, pickedVisitId, pickedEncounterId ->
+                        navController.navigate(
+                            FormsRoutes.form(formId, pickedPatientId, pickedVisitId, pickedEncounterId),
+                        )
                     },
                     onBack = { navController.popBackStack() },
                 )
@@ -614,6 +666,20 @@ fun PrognoCareNavGraph(
                 SpecialistPatientListScreen(
                     onBack = { navController.popBackStack() },
                     onPatientClick = { mrn -> navController.navigate("specialist/patients/$mrn") },
+                )
+            }
+
+            // Specialist patient detail: same tabbed profile as the doctor's
+            // (Overview / Visits / Encounters / Requests / Records), reused via
+            // the doctor route destination.
+            composable(
+                route = "specialist/patients/{patientId}",
+                arguments = listOf(navArgument("patientId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
+                com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPatientDetailScreen(
+                    patientId = patientId,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -711,10 +777,12 @@ fun PrognoCareNavGraph(
             composable(AdminRoutes.DASHBOARD) {
                 AdminDashboardScreen(
                     onNavigateToPatientSearch = { navController.navigate(AdminRoutes.PATIENT_SEARCH) },
+                    onNavigateToRegisterPatient = { navController.navigate(AdminRoutes.REGISTER_PATIENT) },
                     onNavigateToCheckIn = { navController.navigate(AdminRoutes.CHECKIN) },
                     onNavigateToStaff = { navController.navigate(AdminRoutes.STAFF) },
                     onNavigateToChat = { navController.navigate(ChatRoutes.CONVERSATIONS) },
                     onNavigateToProfile = { navController.navigate(ProfileRoutes.PROFILE) },
+                    onNavigateToAppointments = { navController.navigate(ClinicalRoutes.APPOINTMENTS) },
                 )
             }
 
@@ -722,6 +790,30 @@ fun PrognoCareNavGraph(
                 com.ehealthinformatics.prognocare.feature.shared.PatientSearchScreen(
                     title = "Patient Directory",
                     onBack = { navController.popBackStack() },
+                    onPatientClick = { patient ->
+                        navController.navigate("admin/patients/${patient.patientId.ifBlank { patient.id }}")
+                    },
+                )
+            }
+
+            composable(
+                route = "admin/patients/{patientId}",
+                arguments = listOf(navArgument("patientId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
+                com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPatientDetailScreen(
+                    patientId = patientId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(AdminRoutes.REGISTER_PATIENT) {
+                com.ehealthinformatics.prognocare.feature.dashboard.admin.RegisterPatientScreen(
+                    onBack = { navController.popBackStack() },
+                    onRegistered = { mrn ->
+                        // Back to the dashboard; the directory shows the new patient.
+                        navController.popBackStack()
+                    },
                 )
             }
 
@@ -841,6 +933,77 @@ fun PrognoCareNavGraph(
                 )
             }
 
+            // Clinical records: appointments / visits / encounters (shared)
+            composable(ClinicalRoutes.APPOINTMENTS) {
+                ClinicalAppointmentsScreen(
+                    onBack = { navController.popBackStack() },
+                    onCreateAppointment = {
+                        // Dialogs stack on top of the list; popping back to it
+                        // re-runs the list load with the new data.
+                        navController.navigate(ClinicalRoutes.APPOINTMENTS + "/create")
+                    },
+                )
+            }
+
+            composable(ClinicalRoutes.APPOINTMENTS + "/create") {
+                CreateAppointmentDialog(
+                    onDismiss = { navController.popBackStack() },
+                    onCreated = { navController.popBackStack() },
+                )
+            }
+
+            composable(ClinicalRoutes.VISITS) {
+                ClinicalVisitsScreen(
+                    onBack = { navController.popBackStack() },
+                    onStartVisit = { navController.navigate(ClinicalRoutes.VISITS + "/create") },
+                )
+            }
+
+            composable(ClinicalRoutes.VISITS + "/create") {
+                CreateVisitDialog(
+                    onDismiss = { navController.popBackStack() },
+                    onCreated = { navController.popBackStack() },
+                )
+            }
+
+            composable(ClinicalRoutes.ENCOUNTERS) {
+                ClinicalEncountersScreen(
+                    onBack = { navController.popBackStack() },
+                    onEncounterClick = { encounterId ->
+                        navController.navigate(DoctorRoutes.encounter(encounterId))
+                    },
+                    onDocumentEncounter = { navController.navigate(ClinicalRoutes.ENCOUNTERS + "/create") },
+                )
+            }
+
+            composable(ClinicalRoutes.ENCOUNTERS + "/create") {
+                CreateEncounterDialog(
+                    onDismiss = { navController.popBackStack() },
+                    onCreated = { navController.popBackStack() },
+                )
+            }
+
+            composable(ClinicalRoutes.ENCOUNTERS + "/new") {
+                // Doctor "New Encounter": the list with the Document Encounter
+                // dialog opened immediately.
+                ClinicalEncountersScreen(
+                    onBack = { navController.popBackStack() },
+                    onEncounterClick = { encounterId ->
+                        navController.navigate(DoctorRoutes.encounter(encounterId))
+                    },
+                    onDocumentEncounter = { navController.navigate(ClinicalRoutes.ENCOUNTERS + "/create") },
+                )
+                CreateEncounterDialog(
+                    onDismiss = { navController.popBackStack() },
+                    onCreated = { encounterId ->
+                        // Swap this route for the new encounter's screen.
+                        navController.navigate(DoctorRoutes.encounter(encounterId)) {
+                            popUpTo(ClinicalRoutes.ENCOUNTERS + "/new") { inclusive = true }
+                        }
+                    },
+                )
+            }
+
             // Profile (shared across all roles)
             composable(ProfileRoutes.PROFILE) {
                 UserProfileScreen(
@@ -852,6 +1015,12 @@ fun PrognoCareNavGraph(
                     },
                     onOpenServerSettings = {
                         navController.navigate(Routes.SETTINGS)
+                    },
+                    onRoleChanged = { role ->
+                        // Relaunch the whole graph on the new role's dashboard.
+                        navController.navigate(role.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     },
                 )
             }

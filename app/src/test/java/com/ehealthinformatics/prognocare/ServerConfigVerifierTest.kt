@@ -38,7 +38,7 @@ class ServerConfigVerifierTest {
         return AppConfig(
             emrBaseUrl = "$emrUrl/",
             conversationBaseUrl = "$convUrl/api",
-            webChannelId = "channel-1",
+            webChannelCode = "PROGNOCARE_MESSAGING",
         )
     }
 

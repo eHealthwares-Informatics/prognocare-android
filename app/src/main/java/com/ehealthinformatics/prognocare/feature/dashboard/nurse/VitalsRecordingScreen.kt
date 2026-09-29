@@ -251,27 +251,31 @@ fun VitalsRecordingScreen(
                         return@Button
                     }
                     scope.launch {
+                        // Keyed by clinical concept; the schema mapper translates
+                        // them to whatever keys this facility's VITALS form uses.
                         val data: Map<String, Any?> = buildMap {
                             temperature.toDoubleOrNull()?.let { put("temperature", it) }
-                            bpSystolic.toIntOrNull()?.let { put("bp_systolic", it) }
-                            bpDiastolic.toIntOrNull()?.let { put("bp_diastolic", it) }
-                            heartRate.toIntOrNull()?.let { put("heart_rate", it) }
-                            respiratoryRate.toIntOrNull()?.let { put("respiratory_rate", it) }
-                            oxygenSaturation.toIntOrNull()?.let { put("oxygen_saturation", it) }
+                            bpSystolic.toIntOrNull()?.let { put("bpSystolic", it) }
+                            bpDiastolic.toIntOrNull()?.let { put("bpDiastolic", it) }
+                            heartRate.toIntOrNull()?.let { put("heartRate", it) }
+                            respiratoryRate.toIntOrNull()?.let { put("respiratoryRate", it) }
+                            oxygenSaturation.toIntOrNull()?.let { put("oxygenSaturation", it) }
                             weight.toDoubleOrNull()?.let { put("weight", it) }
                             height.toDoubleOrNull()?.let { put("height", it) }
                             if (notes.isNotBlank()) put("notes", notes)
                         }
-                        val ok = viewModel.submitVitals(
-                            formId = form.id,
+                        when (val result = viewModel.submitVitals(
+                            form = form,
                             patientId = patient.id,
-                            data = data,
-                        )
-                        if (ok) {
-                            snackbarHostState.showSnackbar("Vitals recorded successfully")
-                            onSaved()
-                        } else {
-                            snackbarHostState.showSnackbar("Could not save vitals — check the form keys or server")
+                            raw = data,
+                        )) {
+                            is com.ehealthinformatics.prognocare.feature.dashboard.nurse.VitalsSaveResult.Success -> {
+                                snackbarHostState.showSnackbar("Vitals recorded successfully")
+                                onSaved()
+                            }
+                            is com.ehealthinformatics.prognocare.feature.dashboard.nurse.VitalsSaveResult.Failure -> {
+                                snackbarHostState.showSnackbar("Could not save vitals: ${result.message}")
+                            }
                         }
                     }
                 },

@@ -111,6 +111,7 @@ object FinanceRoutes {
 object AdminRoutes {
     const val DASHBOARD = "admin/dashboard"
     const val PATIENT_SEARCH = "admin/patients"
+    const val REGISTER_PATIENT = "admin/patients/register"
     const val CHECKIN = "admin/checkin"
     const val STAFF = "admin/staff"
     const val FACILITIES = "admin/facilities"
@@ -123,6 +124,13 @@ object ChatRoutes {
     const val CONVERSATIONS = "chat"
     const val CONVERSATION_DETAIL = "chat/{conversationId}"
 
+    /**
+     * Sentinel for a not-yet-existing conversation: the screen sends without a
+     * conversation id (newConversation=true) and adopts the id the engine
+     * mints from the first reply event — the same flow as the web widget.
+     */
+    const val NEW_CONVERSATION_ID = "new"
+
     fun conversationDetail(conversationId: String) = "chat/$conversationId"
 }
 
@@ -130,6 +138,14 @@ object ChatRoutes {
 
 object ProfileRoutes {
     const val PROFILE = "profile"
+}
+
+// ── Clinical records (appointments / visits / encounters, shared) ─
+
+object ClinicalRoutes {
+    const val APPOINTMENTS = "clinical/appointments"
+    const val VISITS = "clinical/visits"
+    const val ENCOUNTERS = "clinical/encounters"
 }
 
 // ── Forms (dynamic documentation, shared) ──────────────────────

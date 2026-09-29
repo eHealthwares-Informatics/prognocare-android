@@ -7,16 +7,17 @@ import com.ehealthinformatics.prognocare.data.remote.models.ClinicalRequest
 import com.ehealthinformatics.prognocare.data.remote.models.Encounter
 import com.ehealthinformatics.prognocare.data.remote.models.FormSubmission
 import com.ehealthinformatics.prognocare.data.remote.models.Patient
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
-import dagger.assisted.AssistedInject
+import com.ehealthinformatics.prognocare.data.remote.models.Visit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 data class PatientDetailState(
     val patient: Patient? = null,
+    val visits: List<Visit> = emptyList(),
     val encounters: List<Encounter> = emptyList(),
     val requests: List<ClinicalRequest> = emptyList(),
     val submissions: List<FormSubmission> = emptyList(),
@@ -26,17 +27,20 @@ data class PatientDetailState(
 
 /**
  * Loads one patient plus their encounters, requests, and form submissions.
- * Uses an [AssistedFactory] so the screen can pass the patient id at
- * construction time (the route is created per patient).
+ * The patient id is bound via [bind] from the route argument.
  */
-class PatientDetailViewModel @AssistedInject constructor(
+@HiltViewModel
+class PatientDetailViewModel @Inject constructor(
     private val retrofitClient: RetrofitClient,
-    @Assisted private val patientId: String,
 ) : ViewModel() {
 
-    @AssistedFactory
-    interface Factory {
-        fun create(patientId: String): PatientDetailViewModel
+    private var patientId: String = ""
+
+    /** Bind the route argument and load (idempotent per patient). */
+    fun bind(id: String) {
+        if (patientId == id) return
+        patientId = id
+        refresh()
     }
 
     private val _state = MutableStateFlow(PatientDetailState())
@@ -47,35 +51,52 @@ class PatientDetailViewModel @AssistedInject constructor(
     }
 
     fun refresh() {
+        if (patientId.isBlank()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
                 val apis = retrofitClient.apis.value
-                val patientResp = apis.patientApi.getById(patientId)
-                val patient = patientResp.body()?.takeIf { patientResp.isSuccessful }
+                // The route argument may be the record id OR the MRN
+                // (patient_id) — some role lists pass the MRN. Try id first,
+                // then the by-MRN lookup.
+                val idResp = apis.patientApi.getById(patientId)
+                val patient = idResp.body()?.takeIf { idResp.isSuccessful }
+                    ?: apis.patientApi.getByMrn(patientId).body()
+                        ?.takeIf { it.id.isNotBlank() }
+
+                // Clinical records key on the MRN (patient_id), while some
+                // callers pass the record id — scope child queries by the
+                // resolved MRN when the patient resolved.
+                val scope = patient?.patientId?.takeIf { it.isNotBlank() } ?: patientId
+
+                val visits = runCatching {
+                    apis.visitApi.list(patientId = scope, limit = 50)
+                        .body()?.data.orEmpty()
+                }.getOrDefault(emptyList())
 
                 val encounters = runCatching {
-                    apis.encounterApi.list(patientId = patientId, limit = 50)
+                    apis.encounterApi.list(patientId = scope, limit = 50)
                         .body()?.data.orEmpty()
                 }.getOrDefault(emptyList())
 
                 val requests = runCatching {
-                    apis.requestApi.list(patientId = patientId, limit = 50)
+                    apis.requestApi.list(patientId = scope, limit = 50)
                         .body()?.data.orEmpty()
                 }.getOrDefault(emptyList())
 
                 val submissions = runCatching {
-                    apis.formApi.listSubmissions(patientId = patientId, limit = 50)
+                    apis.formApi.listSubmissions(patientId = scope, limit = 50)
                         .body()?.data.orEmpty()
                 }.getOrDefault(emptyList())
 
                 _state.value = PatientDetailState(
                     patient = patient,
+                    visits = visits,
                     encounters = encounters,
                     requests = requests,
                     submissions = submissions,
                     isLoading = false,
-                    error = if (patient == null) "${patientResp.code()} ${patientResp.message()}" else null,
+                    error = if (patient == null) "Patient not found" else null,
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Failed to load")

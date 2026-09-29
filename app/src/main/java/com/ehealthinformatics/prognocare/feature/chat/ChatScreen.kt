@@ -50,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.data.remote.models.ConversationInboxItem
 import com.ehealthinformatics.prognocare.data.remote.models.ExchangeMessage
+import com.ehealthinformatics.prognocare.navigation.ChatRoutes
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,7 +64,11 @@ fun ChatScreen(
     var messageText by remember { mutableStateOf("") }
     // The conversation being displayed. It starts as the navigated-to id and
     // may switch when the engine ends this conversation and starts a fresh one
-    // in response to the user's next message.
+    // in response to the user's next message. The `new` sentinel means the
+    // user tapped “New conversation”: nothing exists yet, the first send goes
+    // out without a conversation id (newConversation=true) and the screen
+    // adopts the id from the engine's first reply — mirroring the web widget.
+    val isNewConversation = conversationId == ChatRoutes.NEW_CONVERSATION_ID
     var activeId by remember { mutableStateOf(conversationId) }
     var conversationEnded by remember { mutableStateOf(false) }
     val messagesMap by viewModel.messagesByConversation.collectAsStateWithLifecycle()
@@ -72,7 +77,9 @@ fun ChatScreen(
     }
 
     LaunchedEffect(activeId) {
-        viewModel.loadMessages(activeId)
+        if (activeId != ChatRoutes.NEW_CONVERSATION_ID) {
+            viewModel.loadMessages(activeId)
+        }
     }
 
     // Reset the thread when the engine ends the open conversation, and follow
@@ -86,7 +93,10 @@ fun ChatScreen(
     }
     LaunchedEffect(Unit) {
         viewModel.messageArrived.collect { event ->
-            if (conversationEnded && event.conversationId != activeId) {
+            // Adopt a real conversation id from any reply event while we are
+            // in a placeholder state (fresh `new` or ended conversation).
+            val awaitingId = activeId == ChatRoutes.NEW_CONVERSATION_ID || conversationEnded
+            if (awaitingId && event.conversationId != activeId) {
                 activeId = event.conversationId
                 conversationEnded = false
             }
@@ -99,8 +109,19 @@ fun ChatScreen(
         }
     }
 
-    val participantName = conversation?.participantName ?: "Conversation"
-    val participantInitials = conversation?.participantInitials ?: conversationId.take(2).uppercase()
+    /**
+     * The conversation id to send under: null while in a placeholder state —
+     * the `new` sentinel, or after the engine ended the thread — so the send
+     * starts a FRESH conversation exactly like the web widget (an ended
+     * conversation id must never be reused; the engine would not reply).
+     */
+    fun currentSendTarget(): String? =
+        if (isNewConversation || conversationEnded) null else activeId
+
+    val participantName = conversation?.participantName
+        ?: if (isNewConversation) "New conversation" else "Conversation"
+    val participantInitials = conversation?.participantInitials
+        ?: if (isNewConversation) "PC" else conversationId.take(2).uppercase()
 
     Scaffold(
         topBar = {
@@ -114,7 +135,11 @@ fun ChatScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = if (conversationEnded) "ENDED" else conversation?.status ?: "ACTIVE",
+                            text = when {
+                                isNewConversation -> "Ready"
+                                conversationEnded -> "ENDED"
+                                else -> conversation?.status ?: "ACTIVE"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )                    }
@@ -158,7 +183,7 @@ fun ChatScreen(
                     ChatBubble(
                         message = message,
                         onOptionSelect = { value ->
-                            viewModel.sendMessage(activeId, value)
+                            viewModel.sendMessage(currentSendTarget(), value)
                         },
                     )
                 }
@@ -211,7 +236,7 @@ fun ChatScreen(
                 IconButton(
                     onClick = {
                         if (messageText.isNotBlank()) {
-                            viewModel.sendMessage(activeId, messageText.trim())
+                            viewModel.sendMessage(currentSendTarget(), messageText.trim())
                             messageText = ""
                         }
                     },

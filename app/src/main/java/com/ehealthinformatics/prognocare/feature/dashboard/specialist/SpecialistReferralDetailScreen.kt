@@ -12,72 +12,93 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.designsystem.components.StatusBadge
 import com.ehealthinformatics.prognocare.designsystem.components.StatusType
-import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
-data class ReferralDetail(
-    val id: String,
-    val patientName: String,
-    val patientMrn: String,
-    val referringDoctor: String,
-    val reason: String,
-    val clinicalHistory: String,
-    val urgency: String,
-    val status: String,
-    val dateReferred: String,
-    val specialty: String,
-)
+private fun detailStatusType(status: String): StatusType = when (status) {
+    "PENDING" -> StatusType.Pending
+    "ACCEPTED" -> StatusType.Active
+    "DECLINED" -> StatusType.Cancelled
+    "COMPLETED" -> StatusType.Completed
+    else -> StatusType.Pending
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+    }
+    Spacer(modifier = Modifier.height(Spacing.sm))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpecialistReferralDetailScreen(
     referralId: String,
     onBack: () -> Unit,
-    onAccept: () -> Unit,
-    onReject: () -> Unit,
+    viewModel: SpecialistDashboardViewModel = hiltViewModel(),
 ) {
-    val referral = ReferralDetail(
-        id = referralId,
-        patientName = "Adaeze Nwankwo",
-        patientMrn = "MRN-2024-1001",
-        referringDoctor = "Dr. Chidi Okonkwo",
-        reason = "Chest pain with abnormal ECG findings - needs cardiology evaluation",
-        clinicalHistory = "Patient presents with intermittent chest pain for 2 weeks. ECG shows ST-segment changes in leads V4-V6. Previous cardiac history negative. Family history of coronary artery disease.",
-        urgency = "Urgent",
-        status = "PENDING",
-        dateReferred = "Aug 19, 2026",
-        specialty = "Cardiology",
-    )
+    val referral by viewModel.referralDetail.collectAsStateWithLifecycle()
+    val isLoading by viewModel.detailLoading.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var decisionReason by remember { mutableStateOf("") }
+
+    LaunchedEffect(referralId) {
+        viewModel.loadReferral(referralId)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            if (event is ReferralUiEvent.Success) {
+                snackbarHostState.showSnackbar(event.message)
+                viewModel.loadReferral(referralId)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Referral Detail") },
@@ -92,142 +113,160 @@ fun SpecialistReferralDetailScreen(
             )
         },
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(Spacing.base),
-        ) {
-            // ── Patient Header ───────────────────────────────
-            item {
-                Card(
+        when {
+            isLoading -> Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            referral == null -> Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) { Text("Referral not found") }
+            else -> {
+                val r = referral!!
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    shape = RoundedCornerShape(Spacing.base),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.base),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(Spacing.base),
-                        verticalAlignment = Alignment.CenterVertically,
+                    // ── Patient header ─────────────────────────
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                        shape = RoundedCornerShape(Spacing.base),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(Spacing.base),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = referral.patientName.take(1),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold,
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = (r.patientName ?: "P").take(1),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(Spacing.md))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    r.patientName ?: "Patient ${r.patientId}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    "${r.referralNumber ?: ""} · ${r.patientId}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            StatusBadge(text = r.statusDisplay, type = detailStatusType(r.status))
                         }
-                        Spacer(modifier = Modifier.width(Spacing.md))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(referral.patientName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(referral.patientMrn, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    // ── Referral info ──────────────────────────
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                        shape = RoundedCornerShape(Spacing.base),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.base)) {
+                            InfoRow("Referred by", r.referringProviderName ?: "—")
+                            InfoRow("Addressed to", r.specialistProviderName ?: "—")
+                            InfoRow("Specialty", r.specialty ?: "General")
+                            InfoRow("Priority", r.priorityDisplay)
+                            InfoRow("Created", r.createdAt?.take(10) ?: "—")
+                            InfoRow("Status", r.statusDisplay)
+                            if (r.decisionAt != null) {
+                                InfoRow("Decided", r.decisionAt!!.take(10) + (r.decisionReason?.let { " — $it" } ?: ""))
+                            }
+                            if (r.completedAt != null) {
+                                InfoRow("Completed", r.completedAt!!.take(10))
+                            }
                         }
-                        StatusBadge(text = referral.urgency, type = StatusType.Urgent)
                     }
-                }
-            }
 
-            // ── Referral Info ────────────────────────────────
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    shape = RoundedCornerShape(Spacing.base),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.base)) {
-                        InfoRow("Referring Doctor", referral.referringDoctor)
-                        InfoRow("Specialty", referral.specialty)
-                        InfoRow("Date Referred", referral.dateReferred)
-                        InfoRow("Status", referral.status)
-                    }
-                }
-            }
-
-            // ── Reason for Referral ──────────────────────────
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    shape = RoundedCornerShape(Spacing.base),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.base)) {
-                        Text("Reason for Referral", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        Text(referral.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // ── Clinical History ──────────────────────────────
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    shape = RoundedCornerShape(Spacing.base),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.base)) {
-                        Text("Clinical History", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        Text(referral.clinicalHistory, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // ── Action Buttons ────────────────────────────────
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    OutlinedButton(
-                        onClick = onReject,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(Spacing.sm),
+                    // ── Reason ─────────────────────────────────
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                        shape = RoundedCornerShape(Spacing.base),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(Spacing.xs))
-                        Text("Decline")
+                        Column(modifier = Modifier.padding(Spacing.base)) {
+                            Text("Reason for Referral", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+                            Text(r.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (!r.notes.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(Spacing.sm))
+                                Text("Notes", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(Spacing.xs))
+                                Text(r.notes!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
-                    TextButton(
-                        onClick = onAccept,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(Spacing.sm),
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(Spacing.xs))
-                        Text("Accept Referral")
+
+                    // ── Actions ────────────────────────────────
+                    if (r.status == "PENDING" || r.status == "ACCEPTED") {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg),
+                            shape = RoundedCornerShape(Spacing.base),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        ) {
+                            Column(modifier = Modifier.padding(Spacing.base)) {
+                                if (r.status == "PENDING") {
+                                    OutlinedTextField(
+                                        value = decisionReason,
+                                        onValueChange = { decisionReason = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("Decision reason (optional)") },
+                                        minLines = 2,
+                                    )
+                                    Spacer(modifier = Modifier.height(Spacing.sm))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                viewModel.decide(r.id, "DECLINED", decisionReason)
+                                                decisionReason = ""
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                        ) { Text("Decline") }
+                                        Button(
+                                            onClick = {
+                                                viewModel.decide(r.id, "ACCEPTED", decisionReason)
+                                                decisionReason = ""
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                        ) { Text("Accept") }
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = { viewModel.complete(r.id) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Mark Completed") }
+                                }
+                            }
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(Spacing.lg))
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
     }
 }

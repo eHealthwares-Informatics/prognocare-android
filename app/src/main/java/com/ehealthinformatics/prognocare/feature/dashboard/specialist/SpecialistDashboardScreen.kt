@@ -33,7 +33,9 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,6 +56,7 @@ import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpecialistDashboardScreen(
     onNavigateToReferrals: () -> Unit,
@@ -64,11 +67,12 @@ fun SpecialistDashboardScreen(
     viewModel: SpecialistDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val referrals by viewModel.referrals.collectAsStateWithLifecycle()
 
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { /* new referral */ },
+                onClick = onNavigateToReferrals,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(Spacing.lg),
@@ -83,6 +87,10 @@ fun SpecialistDashboardScreen(
             }
         },
     ) { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.refresh() },
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -301,19 +309,23 @@ fun SpecialistDashboardScreen(
                         onActionClick = onNavigateToReferrals,
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
-                    com.ehealthinformatics.prognocare.designsystem.components.DemoDataChip(
-                        text = "Not available — referrals module is not in the backend yet",
-                        modifier = Modifier.padding(bottom = Spacing.sm),
-                    )
+                    if (referrals.isEmpty()) {
+                        Text(
+                            text = "No referrals yet",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = Spacing.sm),
+                        )
+                    }
                 }
             }
 
-            items(state.recentReferrals) { referral ->
+            items(referrals.take(3)) { referral ->
                 ReferralCard(
                     referral = referral,
-                    onClick = { onNavigateToPatientDetail(referral.patientMrn) },
-                    onAccept = { /* referrals not backend-backed yet */ },
-                    onDecline = { /* referrals not backend-backed yet */ },
+                    onClick = { onNavigateToPatientDetail(referral.patientId) },
+                    onAccept = { viewModel.decide(referral.id, "ACCEPTED") },
+                    onDecline = { viewModel.decide(referral.id, "DECLINED") },
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -346,30 +358,29 @@ fun SpecialistDashboardScreen(
             // Bottom spacer for FAB
             item { Spacer(modifier = Modifier.height(Spacing.lg)) }
         }
+        }
     }
 }
 
 @Composable
 private fun ReferralCard(
-    referral: SpecialistReferral,
+    referral: com.ehealthinformatics.prognocare.data.remote.models.Referral,
     onClick: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val (statusType, statusText) = when (referral.status) {
-        ReferralStatus.PENDING -> StatusType.Pending to "Pending"
-        ReferralStatus.IN_REVIEW -> StatusType.InProgress to "In Review"
-        ReferralStatus.ACCEPTED -> StatusType.Active to "Accepted"
-        ReferralStatus.DECLINED -> StatusType.Cancelled to "Declined"
-        ReferralStatus.COMPLETED -> StatusType.Completed to "Completed"
+        "PENDING" -> StatusType.Pending to "Pending"
+        "ACCEPTED" -> StatusType.Active to "Accepted"
+        "DECLINED" -> StatusType.Cancelled to "Declined"
+        "COMPLETED" -> StatusType.Completed to "Completed"
+        else -> StatusType.Pending to referral.status
     }
 
     val priorityColor = when (referral.priority) {
-        ReferralPriority.URGENT -> MaterialTheme.colorScheme.error
-        ReferralPriority.HIGH -> AppThemeColors.current.warning
-        ReferralPriority.NORMAL -> MaterialTheme.colorScheme.primary
-        ReferralPriority.LOW -> MaterialTheme.colorScheme.onSurfaceVariant
+        "URGENT" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
     }
 
     androidx.compose.material3.Card(
@@ -402,7 +413,7 @@ private fun ReferralCard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = referral.patientName.take(1),
+                            text = (referral.patientName ?: "P").take(1),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold,
@@ -411,12 +422,12 @@ private fun ReferralCard(
                     Spacer(modifier = Modifier.width(Spacing.md))
                     Column {
                         Text(
-                            text = referral.patientName,
+                            text = referral.patientName ?: "Patient ${referral.patientId}",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Referred by ${referral.referringDoctor}",
+                            text = "Referred by ${referral.referringProviderName ?: "—"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -429,7 +440,7 @@ private fun ReferralCard(
 
             // ── Referral Details ────────────────────────────
             Text(
-                text = referral.referralReason,
+                text = referral.reason,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
@@ -459,14 +470,14 @@ private fun ReferralCard(
                     )
                 }
                 Text(
-                    text = referral.dateReceived,
+                    text = referral.createdAt?.take(10) ?: "—",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             // ── Action Buttons (for pending referrals) ───────
-            if (referral.status == ReferralStatus.PENDING) {
+            if (referral.status == "PENDING") {
                 Spacer(modifier = Modifier.height(Spacing.md))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

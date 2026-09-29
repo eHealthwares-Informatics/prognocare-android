@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -53,6 +55,7 @@ import com.ehealthinformatics.prognocare.data.remote.models.ClinicalRequest
 import com.ehealthinformatics.prognocare.data.remote.models.Encounter
 import com.ehealthinformatics.prognocare.data.remote.models.FormSubmission
 import com.ehealthinformatics.prognocare.data.remote.models.Patient
+import com.ehealthinformatics.prognocare.data.remote.models.Visit
 import com.ehealthinformatics.prognocare.designsystem.components.EmptyState
 import com.ehealthinformatics.prognocare.designsystem.components.ErrorState
 import com.ehealthinformatics.prognocare.designsystem.components.StatusBadge
@@ -66,16 +69,12 @@ fun DoctorPatientDetailScreen(
     patientId: String,
     onBack: () -> Unit,
     onOpenDocumentation: ((String) -> Unit)? = null,
-    viewModel: PatientDetailViewModel = hiltViewModel(
-        key = patientId,
-        creationCallback = { factory: PatientDetailViewModel.Factory ->
-            factory.create(patientId)
-        },
-    ),
+    viewModel: PatientDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(patientId) { viewModel.bind(patientId) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Overview", "Encounters", "Requests", "Records")
+    val tabs = listOf("Overview", "Visits", "Encounters", "Requests", "Records")
 
     Scaffold(
         topBar = {
@@ -93,9 +92,8 @@ fun DoctorPatientDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* edit */ }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Patient")
-                    }
+                    // Doctors document care but do not edit patient demographics;
+                    // registration edits belong to the admin/records desk.
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -152,9 +150,10 @@ fun DoctorPatientDetailScreen(
 
                     when (selectedTab) {
                         0 -> OverviewTab(patient)
-                        1 -> EncountersTab(state.encounters)
-                        2 -> RequestsTab(state.requests)
-                        3 -> RecordsTab(state.submissions)
+                        1 -> VisitsTab(state.visits)
+                        2 -> EncountersTab(state.encounters)
+                        3 -> RequestsTab(state.requests)
+                        4 -> RecordsTab(state.submissions, onRefresh = viewModel::refresh)
                     }
                 }
             }
@@ -241,6 +240,61 @@ private fun OverviewTab(patient: Patient) {
                 InfoRow("Marital Status", patient.maritalStatus ?: "—")
                 InfoRow("Occupation", patient.occupation ?: "—")
                 InfoRow("Registered", patient.createdAt?.take(10) ?: "—")
+            }
+        }
+    }
+}
+
+@Composable
+private fun VisitsTab(visits: List<Visit>) {
+    if (visits.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.MedicalServices,
+            title = "No visits",
+            message = "Visits for this patient will appear here",
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        items(visits, key = { it.id }) { visit ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Spacing.base),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.base)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = visit.typeDisplay,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        StatusBadge(
+                            text = visit.status.lowercase().replaceFirstChar { it.uppercase() },
+                            type = when (visit.status) {
+                                "ONGOING" -> StatusType.Active
+                                "COMPLETED" -> StatusType.Completed
+                                else -> StatusType.Cancelled
+                            },
+                        )
+                    }
+                    Text(
+                        text = listOfNotNull(
+                            visit.visitNumber,
+                            visit.startDatetime?.take(10),
+                            visit.stopDatetime?.take(10)?.let { "Ended $it" },
+                            visit.providerName,
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -335,12 +389,30 @@ private fun RequestsTab(requests: List<ClinicalRequest>) {
 }
 
 @Composable
-private fun RecordsTab(submissions: List<FormSubmission>) {
+private fun RecordsTab(
+    submissions: List<FormSubmission>,
+    onRefresh: () -> Unit,
+) {
+    // Refreshable: pull the documentation again on demand.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        TextButton(onClick = onRefresh) {
+            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Text("Refresh")
+        }
+    }
     if (submissions.isEmpty()) {
         EmptyState(
             icon = Icons.Default.MedicalServices,
             title = "No records yet",
-            message = "Documentation for this patient will appear here",
+            message = "Documentation for this patient will appear here. Tap refresh after adding documentation.",
+            actionText = "Refresh",
+            onActionClick = onRefresh,
         )
         return
     }

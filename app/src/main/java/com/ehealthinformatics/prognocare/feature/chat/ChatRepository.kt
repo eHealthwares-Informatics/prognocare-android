@@ -111,15 +111,18 @@ class ChatRepository @Inject constructor(
             }
     }
 
-    suspend fun sendText(conversationId: String?, senderPhone: String, text: String) {
-        val config = configStore.config.value
+    /** The stable channel code PrognoCare addresses the messaging bot with. */
+    private val messagingChannelCode = "PROGNOCARE_MESSAGING"
+
+    suspend fun sendText(conversationId: String?, senderPhone: String, text: String, newConversation: Boolean = false) {
         val api = chatClient.chatApi.value
         api.sendWebhook(
             SendWebhookDto(
-                channelId = config.webChannelId,
+                channelCode = messagingChannelCode,
                 senderPhone = senderPhone,
                 text = text,
                 conversationId = conversationId,
+                newConversation = newConversation,
             )
         )
     }
@@ -129,18 +132,17 @@ class ChatRepository @Inject constructor(
         runCatching { api.markRead(conversationId) }
     }
 
-    fun senderPhone(): String {
-        val prefs = context.getSharedPreferences("prognocare_auth", Context.MODE_PRIVATE)
-        return prefs.getString("user_phone", null)
-            ?: AuthInterceptor.getToken(context)?.take(8)
-            ?: ""
-    }
+    fun senderPhone(): String = ChatIdentity.phone(context)
 
     private fun handleSocketMessage(raw: JSONObject) {
         scope.launch {
             val convId = raw.optString("conversationId")
             val text = raw.optString("text")
             if (convId.isNotEmpty()) {
+                // A pending-<participantId> placeholder means the engine is
+                // still minting the real conversation for this first reply;
+                // keep it under its own bucket so the screen can follow it.
+                val bucket = convId.ifEmpty { "pending" }
                 val message = ExchangeMessage(
                     id = raw.optString("id"),
                     conversationId = convId,
@@ -151,7 +153,7 @@ class ChatRepository @Inject constructor(
                     createdAt = raw.optString("createdAt"),
                     status = raw.optString("status").ifEmpty { null },
                 )
-                val existing = _messagesByConversation.value[convId].orEmpty()
+                val existing = _messagesByConversation.value[bucket].orEmpty()
                 val hasSame = existing.any {
                     it.id.isNotEmpty() && it.id == message.id ||
                         it.text == text && it.direction == message.direction
@@ -159,14 +161,15 @@ class ChatRepository @Inject constructor(
                 if (!hasSame) {
                     _messagesByConversation.value = buildMap {
                         putAll(_messagesByConversation.value)
-                        put(convId, existing + message)
+                        put(bucket, existing + message)
                     }
                 }
                 _messageArrived.tryEmit(message)
 
-                val senderPhone = senderPhone()
-                val selfSent = message.senderId != null && message.senderId == senderPhone ||
-                    message.senderId.isNullOrEmpty()
+                // Bot/webhook replies carry the participant's participant id
+                // (or a channel pseudo-participant id), not our phone — treat
+                // empty-direction-orphan sends as inbound for the notify path.
+                val selfSent = message.senderId == senderPhone()
                 if (message.direction.equals("inbound", ignoreCase = true) && !selfSent) {
                     _newMessage.tryEmit(
                         IncomingMessageNotification(

@@ -62,6 +62,10 @@ data class FormSubmission(
     val submittedAt: String? = null,
     val amendmentOf: String? = null,
     val amendedFromId: String? = null,
+    // Schema-version awareness: true when the submission was filled against
+    // an older published schema than the form definition currently exposes.
+    val schemaOutdated: Boolean = false,
+    val schemaCurrentVersion: Int? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )

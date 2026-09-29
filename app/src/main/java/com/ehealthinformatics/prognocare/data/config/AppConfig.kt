@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 data class AppConfig(
     val emrBaseUrl: String = AppConfigStore.DEFAULT_EMR_URL,
     val conversationBaseUrl: String = AppConfigStore.DEFAULT_CONVERSATION_URL,
-    val webChannelId: String = AppConfigStore.DEFAULT_WEB_CHANNEL_ID,
+    /** Stable conversation-engine channel code (NOT a DB id). */
+    val webChannelCode: String = AppConfigStore.DEFAULT_WEB_CHANNEL_CODE,
 )
 
 val AppConfig.conversationSocketUrl: String
@@ -25,7 +26,7 @@ fun AppConfig.withConversationBaseUrl(raw: String): AppConfig {
     return copy(conversationBaseUrl = normalized)
 }
 
-fun AppConfig.withWebChannelId(raw: String): AppConfig {
-    val normalized = raw.trim().ifEmpty { webChannelId }
-    return copy(webChannelId = normalized)
+fun AppConfig.withWebChannelCode(raw: String): AppConfig {
+    val normalized = raw.trim().ifEmpty { webChannelCode }
+    return copy(webChannelCode = normalized)
 }

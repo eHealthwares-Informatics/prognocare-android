@@ -83,6 +83,15 @@ class DoctorDashboardViewModel @Inject constructor(
 
                 val summary = runCatching { emrRepository.dashboard(today.toString()) }.getOrNull()
 
+                // "Total" = distinct patients this doctor has ever attended
+                // (any visit or encounter); org-wide when no staff record is
+                // linked to the signed-in user.
+                val attendedPatients = runCatching {
+                    retrofitClient.apis.value.dashboardApi
+                        .attendedPatients(providerId = staffId)
+                        .body()?.count ?: summary?.metrics?.totalPatients ?: 0
+                }.getOrDefault(summary?.metrics?.totalPatients ?: 0)
+
                 // Self-scoped when a staff record is linked; falls back to the clinic-wide view.
                 val myAppointments: List<Appointment> = appointmentsRepository.list(
                     AppointmentQuery(date = today.toString(), providerId = staffId, limit = 50),
@@ -125,7 +134,7 @@ class DoctorDashboardViewModel @Inject constructor(
                     greeting = greetingForNow(),
                     doctorName = SessionStore.getStaffName(context) ?: "Doctor",
                     todayDate = today.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
-                    totalPatients = summary?.metrics?.totalPatients ?: 0,
+                    totalPatients = attendedPatients,
                     todayAppointments = myAppointments.size,
                     pendingTasks = myAppointments.count {
                         it.status in listOf("SCHEDULED", "CHECKED_IN", "IN_PROGRESS")
