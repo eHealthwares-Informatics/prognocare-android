@@ -155,6 +155,7 @@ object ClinicalRoutes {
     const val APPOINTMENTS = "clinical/appointments"
     const val VISITS = "clinical/visits"
     const val ENCOUNTERS = "clinical/encounters"
+    const val ADMISSIONS = "clinical/admissions"
 }
 
 // ── Forms (dynamic documentation, shared) ──────────────────────

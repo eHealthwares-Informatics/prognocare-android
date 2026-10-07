@@ -74,6 +74,8 @@ fun NurseDashboardScreen(
     onNavigateToPatients: () -> Unit,
     onNavigateToChat: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToVisits: () -> Unit = {},
+    onNavigateToAdmissions: () -> Unit = {},
     viewModel: NurseDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -241,7 +243,7 @@ fun NurseDashboardScreen(
                             icon = Icons.Outlined.MedicalServices,
                             iconTint = MaterialTheme.colorScheme.error,
                             iconBg = MaterialTheme.colorScheme.errorContainer,
-                            onClick = onNavigateToMedications,
+                            onClick = onNavigateToVisits,
                             modifier = Modifier.weight(1f),
                         )
                         DashboardKpiCard(
@@ -250,7 +252,7 @@ fun NurseDashboardScreen(
                             icon = Icons.Default.CheckCircle,
                             iconTint = AppThemeColors.current.kpiGreen,
                             iconBg = AppThemeColors.current.kpiGreenLight,
-                            onClick = { /* admissions */ },
+                            onClick = onNavigateToAdmissions,
                             modifier = Modifier.weight(1f),
                         )
                     }

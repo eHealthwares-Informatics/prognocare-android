@@ -83,6 +83,7 @@ import com.ehealthinformatics.prognocare.feature.chat.ConversationListScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalAppointmentsScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalEncountersScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalVisitsScreen
+import com.ehealthinformatics.prognocare.feature.clinical.AdmissionsListScreen
 import com.ehealthinformatics.prognocare.feature.clinical.CreateAppointmentDialog
 import com.ehealthinformatics.prognocare.feature.clinical.CreateEncounterDialog
 import com.ehealthinformatics.prognocare.feature.clinical.CreateVisitDialog
@@ -557,6 +558,8 @@ fun PrognoCareNavGraph(
                     onNavigateToPatients = { navController.navigate(NurseRoutes.PATIENT_LIST) },
                     onNavigateToChat = { navController.navigate(ChatRoutes.CONVERSATIONS) },
                     onNavigateToProfile = { navController.navigate(ProfileRoutes.PROFILE) },
+                    onNavigateToVisits = { navController.navigate(ClinicalRoutes.VISITS) },
+                    onNavigateToAdmissions = { navController.navigate(ClinicalRoutes.ADMISSIONS) },
                 )
             }
 
@@ -990,6 +993,12 @@ fun PrognoCareNavGraph(
                 ClinicalVisitsScreen(
                     onBack = { navController.popBackStack() },
                     onStartVisit = { navController.navigate(ClinicalRoutes.VISITS + "/create") },
+                )
+            }
+
+            composable(ClinicalRoutes.ADMISSIONS) {
+                AdmissionsListScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
 
