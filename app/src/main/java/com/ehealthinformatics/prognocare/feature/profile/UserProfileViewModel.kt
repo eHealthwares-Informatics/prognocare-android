@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.auth.SessionStore
 import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.data.config.AppConfigStore
+import com.ehealthinformatics.prognocare.data.config.withServerEnvironment
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.MeResponse
 import com.ehealthinformatics.prognocare.feature.splash.SplashViewModel
@@ -116,14 +117,26 @@ class UserProfileViewModel @Inject constructor(
         return response.body()?.data?.firstOrNull()
     }
 
-    fun saveServerConfig(emr: String, conversation: String, webChannelCode: String) {
+    fun saveServerConfig(
+        emr: String,
+        conversation: String,
+        webChannelCode: String,
+        environment: com.ehealthinformatics.prognocare.data.config.ServerEnvironment? = null,
+    ) {
         viewModelScope.launch {
+            val current = configStore.config.value
+            val env = environment ?: current.serverEnvironment
             configStore.updateConfig(
-                configStore.config.value.copy(
-                    emrBaseUrl = emr,
-                    conversationBaseUrl = conversation,
-                    webChannelCode = webChannelCode,
-                ),
+                current
+                    .withServerEnvironment(env)
+                    .copy(
+                        emrBaseUrl = emr.trim().trimEnd('/').ifEmpty { current.emrBaseUrl }.let {
+                            if (it.endsWith("/")) it else "$it/"
+                        },
+                        conversationBaseUrl = conversation.trim().trimEnd('/')
+                            .ifEmpty { current.conversationBaseUrl },
+                        webChannelCode = webChannelCode.trim().ifEmpty { current.webChannelCode },
+                    ),
             )
         }
     }

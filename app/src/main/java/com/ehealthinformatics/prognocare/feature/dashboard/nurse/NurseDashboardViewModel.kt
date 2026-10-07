@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.auth.SessionStore
+import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.feature.appointments.AppointmentQuery
 import com.ehealthinformatics.prognocare.feature.appointments.AppointmentsRepository
 import com.ehealthinformatics.prognocare.feature.forms.VitalsReadings
@@ -23,6 +24,7 @@ import javax.inject.Inject
 class NurseDashboardViewModel @Inject constructor(
     private val appointmentsRepository: AppointmentsRepository,
     private val emrRepository: EmrRepository,
+    private val retrofitClient: RetrofitClient,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -142,17 +144,29 @@ class NurseDashboardViewModel @Inject constructor(
                     }
 
                 // Recent vitals → display rows (newest first, cap 10).
+                // Resolve patient names so the list never shows raw MRNs/UUIDs.
+                val patientNames = runCatching {
+                    val resp = retrofitClient.apis.value.patientApi.list(page = 1, limit = 200)
+                    if (resp.isSuccessful) {
+                        resp.body()?.data.orEmpty().associate { p ->
+                            (p.patientId.ifBlank { p.id }) to p.displayName
+                        }
+                    } else {
+                        emptyMap<String, String>()
+                    }
+                }.getOrDefault(emptyMap())
+
                 val recentVitals = vitalsSubmissions
                     .sortedByDescending { it.submittedAt ?: it.createdAt.orEmpty() }
                     .take(10)
                     .mapNotNull { submission ->
                         val readings = VitalsReadings.from(submission) ?: return@mapNotNull null
-                        // Parse BP "120/80 mmHg" back into parts for VitalsRecord.
                         val bp = readings.bloodPressure
                         val bpParts = bp?.split("/")?.map { it.trim() }
+                        val mrn = submission.patientId
                         VitalsRecord(
                             id = submission.id,
-                            patientName = submission.patientId.ifBlank { "Patient" },
+                            patientName = patientNames[mrn] ?: mrn.ifBlank { "Patient" },
                             recordedAt = (submission.submittedAt ?: submission.createdAt ?: "")
                                 .take(16)
                                 .replace('T', ' '),

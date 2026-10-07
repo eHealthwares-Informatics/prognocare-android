@@ -16,6 +16,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -33,21 +35,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.data.config.ConnectionCheck
+import com.ehealthinformatics.prognocare.data.config.ServerEnvironment
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
 /**
  * Shared server-config editor used by the hidden 7-tap panel on the login
- * screen and the full SettingsScreen. Saves the three URL/channel fields.
+ * screen and the full SettingsScreen. Environment preset fills base URLs;
+ * fields stay editable for custom endpoints.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ServerConfigContent(
     config: AppConfig,
-    onSave: (emrBaseUrl: String, conversationBaseUrl: String, webChannelCode: String) -> Unit,
+    onSave: (
+        emrBaseUrl: String,
+        conversationBaseUrl: String,
+        webChannelCode: String,
+        environment: ServerEnvironment,
+    ) -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
     isVerifying: Boolean = false,
     saveResult: SaveResult? = null,
 ) {
+    var environment by rememberSaveable { mutableStateOf(config.serverEnvironment) }
     var emrUrl by rememberSaveable { mutableStateOf(config.emrBaseUrl) }
     var conversationUrl by rememberSaveable { mutableStateOf(config.conversationBaseUrl) }
     var channelCode by rememberSaveable { mutableStateOf(config.webChannelCode) }
@@ -70,10 +81,32 @@ fun ServerConfigContent(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Point the app at your EMR and Conversation Engine endpoints.",
+                text = "Choose Production or Development, then adjust URLs if needed.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                ServerEnvironment.entries.forEach { env ->
+                    FilterChip(
+                        selected = environment == env,
+                        onClick = {
+                            environment = env
+                            emrUrl = env.emrBaseUrl
+                            conversationUrl = env.conversationBaseUrl
+                        },
+                        label = { Text(env.label) },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    )
+                }
+            }
 
             OutlinedTextField(
                 value = emrUrl,
@@ -119,7 +152,7 @@ fun ServerConfigContent(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Button(
-                    onClick = { onSave(emrUrl, conversationUrl, channelCode) },
+                    onClick = { onSave(emrUrl, conversationUrl, channelCode, environment) },
                     modifier = Modifier.weight(1f),
                     enabled = !isVerifying,
                     shape = RoundedCornerShape(Spacing.md),
@@ -161,7 +194,8 @@ fun ServerConfigContent(
 
             Spacer(modifier = Modifier.height(Spacing.xs))
             Text(
-                text = "Saved URLs apply immediately to the app's network clients.",
+                text = "Production uses api.ehealthwares.com + conversation.ehealthwares.com. " +
+                    "Development uses the local/LAN defaults.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

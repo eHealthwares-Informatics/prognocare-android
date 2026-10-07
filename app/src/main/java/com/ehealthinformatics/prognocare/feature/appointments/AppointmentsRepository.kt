@@ -1,7 +1,7 @@
 package com.ehealthinformatics.prognocare.feature.appointments
 
 import com.ehealthinformatics.prognocare.data.config.AppConfigStore
-import com.ehealthinformatics.prognocare.data.config.queryDateRange
+import com.ehealthinformatics.prognocare.data.config.resolveQueryDateRange
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.Appointment
 import com.ehealthinformatics.prognocare.data.remote.models.CancelAppointmentDto
@@ -42,7 +42,8 @@ data class AppointmentQuery(
  *
  * Date resolution order for list queries:
  * 1. Explicit [AppointmentQuery.date]
- * 2. Settings query date range (`BETWEEN|start|end` DSL)
+ * 2. Settings query range period (today / last day / week / month — resolved
+ *    dynamically at query time)
  * 3. Today, when [AppointmentQuery.defaultToday] is true
  */
 @Singleton
@@ -57,11 +58,13 @@ class AppointmentsRepository @Inject constructor(
 
     /**
      * Resolves the EMR `date` query param from explicit filter → configured
-     * query range → optional today fallback.
+     * query range period → optional today fallback.
      */
     fun resolveDateParam(explicit: String?, defaultToday: Boolean = false): String? {
         if (explicit != null) return explicit
-        val fromRange = configStore.config.value.queryDateRange()?.toAppointmentDateParam()
+        val fromRange = configStore.config.value
+            .resolveQueryDateRange()
+            ?.toAppointmentDateParam()
         if (fromRange != null) return fromRange
         return if (defaultToday) today() else null
     }

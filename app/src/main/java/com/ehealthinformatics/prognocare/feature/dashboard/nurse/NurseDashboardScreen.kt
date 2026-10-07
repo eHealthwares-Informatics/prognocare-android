@@ -308,7 +308,7 @@ fun NurseDashboardScreen(
                         )
                         DashboardQuickAction(
                             icon = Icons.Outlined.MedicalServices,
-                            label = "Administer Meds",
+                            label = "Meds",
                             iconTint = MaterialTheme.colorScheme.error,
                             iconBg = MaterialTheme.colorScheme.errorContainer,
                             onClick = onNavigateToMedications,

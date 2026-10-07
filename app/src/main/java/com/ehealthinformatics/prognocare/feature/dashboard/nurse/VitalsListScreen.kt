@@ -169,7 +169,7 @@ private fun VitalsListCard(item: VitalsListItem) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = submission.patientId.ifBlank { "Patient" },
+                        text = item.patientDisplayName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,

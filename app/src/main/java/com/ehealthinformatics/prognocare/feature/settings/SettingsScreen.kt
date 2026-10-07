@@ -75,8 +75,8 @@ fun SettingsScreen(
         ) {
             ServerConfigContent(
                 config = config,
-                onSave = { emr, conv, channel ->
-                    viewModel.saveConfig(emr, conv, channel)
+                onSave = { emr, conv, channel, env ->
+                    viewModel.saveConfig(emr, conv, channel, env)
                 },
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
@@ -86,8 +86,7 @@ fun SettingsScreen(
 
             QueryDateRangeContent(
                 config = config,
-                onSave = { start, end -> viewModel.saveQueryDateRange(start, end) },
-                onClear = { viewModel.clearQueryDateRange() },
+                onSave = { period -> viewModel.saveQueryRange(period) },
                 isSaving = dateRangeSaving,
                 saveMessage = dateRangeMessage,
                 modifier = Modifier.fillMaxWidth(),

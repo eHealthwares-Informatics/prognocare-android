@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 data class VitalsListItem(
     val submission: FormSubmission,
     val readings: VitalsReadings.Vitals,
+    /** Human name resolved from the patient list (not the raw MRN/UUID). */
+    val patientDisplayName: String,
 )
 
 data class VitalsListState(
@@ -37,14 +39,33 @@ class VitalsListViewModel @Inject constructor(
     private val _state = MutableStateFlow(VitalsListState())
     val state: StateFlow<VitalsListState> = _state.asStateFlow()
 
+    /** MRN → display name, filled from the patient list on load. */
+    private var patientNames: Map<String, String> = emptyMap()
+
     init {
         load()
     }
 
     fun load() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = _state.value.items.isEmpty(), isRefreshing = true, error = null)
+            _state.value = _state.value.copy(
+                isLoading = _state.value.items.isEmpty(),
+                isRefreshing = true,
+                error = null,
+            )
             try {
+                // Resolve patient names so the list never shows raw MRNs/UUIDs.
+                patientNames = runCatching {
+                    val resp = retrofitClient.apis.value.patientApi.list(page = 1, limit = 200)
+                    if (resp.isSuccessful) {
+                        resp.body()?.data.orEmpty().associate { p ->
+                            (p.patientId.ifBlank { p.id }) to p.displayName
+                        }
+                    } else {
+                        emptyMap()
+                    }
+                }.getOrDefault(emptyMap())
+
                 val response = retrofitClient.apis.value.formApi.listSubmissions(limit = 100)
                 val all = if (response.isSuccessful) response.body()?.data.orEmpty() else emptyList()
                 val vitals = all
@@ -52,7 +73,9 @@ class VitalsListViewModel @Inject constructor(
                     .filter { it.status != "DRAFT" }
                     .sortedByDescending { it.submittedAt ?: it.createdAt.orEmpty() }
                     .mapNotNull { submission ->
-                        VitalsReadings.from(submission)?.let { VitalsListItem(submission, it) }
+                        VitalsReadings.from(submission)?.let { readings ->
+                            VitalsListItem(submission, readings, patientLabel(submission.patientId))
+                        }
                     }
                 _state.value = VitalsListState(
                     items = vitals,
@@ -73,6 +96,9 @@ class VitalsListViewModel @Inject constructor(
             }
         }
     }
+
+    private fun patientLabel(mrn: String): String =
+        patientNames[mrn] ?: mrn.ifBlank { "Patient" }
 
     fun retry() {
         _state.value = _state.value.copy(error = null)
