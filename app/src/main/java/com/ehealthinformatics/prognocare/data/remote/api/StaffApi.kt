@@ -15,7 +15,7 @@ import retrofit2.http.Query
 
 interface StaffApi {
 
-    @GET("api/staff")
+    @GET("staff")
     suspend fun list(
         @Query("search") search: String? = null,
         @Query("roleType") roleType: String? = null,
@@ -26,18 +26,18 @@ interface StaffApi {
         @Query("limit") limit: Int = 20,
     ): Response<PaginatedResponse<Staff>>
 
-    @POST("api/staff")
+    @POST("staff")
     suspend fun create(@Body dto: CreateStaffDto): Response<Staff>
 
-    @GET("api/staff/{id}")
+    @GET("staff/{id}")
     suspend fun getById(@Path("id") id: String): Response<Staff>
 
-    @PATCH("api/staff/{id}")
+    @PATCH("staff/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdateStaffDto,
     ): Response<Staff>
 
-    @DELETE("api/staff/{id}")
+    @DELETE("staff/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }

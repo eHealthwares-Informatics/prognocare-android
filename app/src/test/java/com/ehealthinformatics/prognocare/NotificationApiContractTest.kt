@@ -125,7 +125,7 @@ class NotificationApiContractTest {
 
         val request = server.takeRequest()
         assertEquals("PUT", request.method)
-        assertTrue(request.path.orEmpty().contains("/api/notifications/notif-1/read"))
+        assertTrue(request.path.orEmpty().contains("/notifications/notif-1/read"))
     }
 
     @Test
@@ -141,7 +141,7 @@ class NotificationApiContractTest {
 
         val request = server.takeRequest()
         assertEquals("PATCH", request.method)
-        assertTrue(request.path.orEmpty().contains("/api/notifications/read-all"))
+        assertTrue(request.path.orEmpty().contains("/notifications/read-all"))
     }
 
     @Test
@@ -168,6 +168,9 @@ class NotificationApiContractTest {
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertTrue(request.path.orEmpty().contains("/api/notification-subscriptions"))
+        // Contract: body optional; tenant comes from JWT — never send org/location.
+        val body = request.body.readUtf8()
+        assertTrue(body.isBlank() || body == "{}" || !body.contains("organizationId"))
     }
 
     @Test

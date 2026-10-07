@@ -71,7 +71,7 @@ class AuthApiContractTest {
         assertEquals(900, body.accessTokenExpiresIn)
 
         val request = server.takeRequest()
-        assertEquals("/api/auth/login", request.path)
+        assertEquals("/auth/login", request.path)
         assertEquals("POST", request.method)
         assertTrue(request.body.readUtf8().contains("\"admin\""))
     }

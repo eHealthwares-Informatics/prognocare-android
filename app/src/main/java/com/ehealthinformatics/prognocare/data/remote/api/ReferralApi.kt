@@ -15,7 +15,7 @@ import retrofit2.http.Query
 
 interface ReferralApi {
 
-    @GET("api/referrals")
+    @GET("referrals")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50,
@@ -26,24 +26,24 @@ interface ReferralApi {
         @Query("encounterId") encounterId: String? = null,
     ): Response<PaginatedResponse<Referral>>
 
-    @GET("api/referrals/{id}")
+    @GET("referrals/{id}")
     suspend fun getById(@Path("id") id: String): Response<Referral>
 
-    @POST("api/referrals")
+    @POST("referrals")
     suspend fun create(@Body dto: CreateReferralDto): Response<Referral>
 
-    @POST("api/referrals/{id}/decide")
+    @POST("referrals/{id}/decide")
     suspend fun decide(
         @Path("id") id: String,
         @Body dto: DecideReferralDto,
     ): Response<Referral>
 
-    @POST("api/referrals/{id}/complete")
+    @POST("referrals/{id}/complete")
     suspend fun complete(
         @Path("id") id: String,
         @Body dto: CompleteReferralDto,
     ): Response<Referral>
 
-    @DELETE("api/referrals/{id}")
+    @DELETE("referrals/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }

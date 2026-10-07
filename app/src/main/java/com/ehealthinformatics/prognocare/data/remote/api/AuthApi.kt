@@ -12,9 +12,9 @@ import retrofit2.http.POST
 // rxsoft-identity service and returns the shared JWT.
 interface AuthApi {
 
-    @POST("api/auth/login")
+    @POST("auth/login")
     suspend fun login(@Body dto: LoginDto): Response<AuthResponse>
 
-    @GET("api/auth/me")
+    @GET("auth/me")
     suspend fun me(): Response<MeResponse>
 }

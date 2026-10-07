@@ -43,15 +43,23 @@ enum class ServerEnvironment(val id: String, val label: String) {
     DEVELOPMENT("development", "Development"),
     ;
 
+    /**
+     * Production gateway (api.ehealthwares.com) strips the service prefix and
+     * Nest adds `/api` internally — external paths are `/emr/...` and
+     * `/conversation/...` (no extra `api/` segment). Health:
+     * - EMR: `https://api.ehealthwares.com/emr/health`
+     * - Conversation: `https://api.ehealthwares.com/conversation/health`
+     */
     val emrBaseUrl: String
         get() = when (this) {
-            PRODUCTION -> "https://api.ehealthwares.com/"
+            PRODUCTION -> "https://api.ehealthwares.com/emr"
             DEVELOPMENT -> AppConfigStore.DEFAULT_EMR_URL
         }
 
     val conversationBaseUrl: String
         get() = when (this) {
-            PRODUCTION -> "https://conversation.ehealthwares.com/api"
+            // conversation.ehealthwares.com serves the web SPA, not the API.
+            PRODUCTION -> "https://api.ehealthwares.com/conversation"
             DEVELOPMENT -> AppConfigStore.DEFAULT_CONVERSATION_URL
         }
 

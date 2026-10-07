@@ -23,7 +23,7 @@ android {
         buildConfigField(
             "String",
             "DEFAULT_EMR_URL",
-            "\"${System.getenv("RXSOFT_EMR_URL") ?: "http://10.0.2.2:8093/"}\""
+            "\"${System.getenv("RXSOFT_EMR_URL") ?: "http://10.0.2.2:8093/api"}\""
         )
         buildConfigField(
             "String",
