@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -33,13 +32,13 @@ import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,10 +50,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthinformatics.prognocare.designsystem.components.AppointmentRow
 import com.ehealthinformatics.prognocare.designsystem.components.DashboardKpiCard
 import com.ehealthinformatics.prognocare.designsystem.components.DashboardQuickAction
+import com.ehealthinformatics.prognocare.designsystem.components.NotificationBell
 import com.ehealthinformatics.prognocare.designsystem.components.SectionHeader
 import com.ehealthinformatics.prognocare.designsystem.components.StatusType
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
+import com.ehealthinformatics.prognocare.feature.notifications.NotificationsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,9 +68,16 @@ fun DoctorDashboardScreen(
     onNavigateToEncounters: () -> Unit = {},
     onNavigateToNewRequest: () -> Unit = {},
     onNavigateToClinicalNote: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     viewModel: DoctorDashboardViewModel = hiltViewModel(),
+    notificationsViewModel: NotificationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val notifications by notificationsViewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        notificationsViewModel.onDashboardOpen()
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -91,7 +99,10 @@ fun DoctorDashboardScreen(
     ) { innerPadding ->
         PullToRefreshBox(
             isRefreshing = state.isLoading,
-            onRefresh = { viewModel.retry() },
+            onRefresh = {
+                viewModel.retry()
+                notificationsViewModel.onDashboardOpen()
+            },
         ) {
         LazyColumn(
             modifier = Modifier
@@ -143,34 +154,10 @@ fun DoctorDashboardScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Notification bell with badge
-                            Box {
-                                IconButton(onClick = { /* notifications */ }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        contentDescription = "Notifications",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(28.dp),
-                                    )
-                                }
-                                if (state.urgentCount > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .size(20.dp)
-                                            .clip(CircleShape)
-                                            .background(AppThemeColors.current.notificationBadge),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = "${state.urgentCount}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppThemeColors.current.onNotificationBadge,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
-                            }
+                            NotificationBell(
+                                unreadCount = notifications.unreadCount,
+                                onClick = onNavigateToNotifications,
+                            )
 
                             Spacer(modifier = Modifier.width(Spacing.sm))
 
