@@ -5,6 +5,6 @@ import retrofit2.Response
 import retrofit2.http.GET
 
 interface ConversationHealthApi {
-    @GET("api/health")
+    @GET("health")
     suspend fun health(): Response<HealthStatus>
 }

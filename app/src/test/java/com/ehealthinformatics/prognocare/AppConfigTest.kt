@@ -43,10 +43,11 @@ class AppConfigTest {
     }
 
     @Test
-    fun `production environment fills ehealthwares urls`() {
+    fun `production environment fills ehealthwares gateway urls`() {
         val prod = config.withServerEnvironment(ServerEnvironment.PRODUCTION)
-        assertEquals("https://api.ehealthwares.com/", prod.emrBaseUrl)
-        assertEquals("https://conversation.ehealthwares.com/api", prod.conversationBaseUrl)
+        // Gateway strips /emr and /conversation; Nest serves /api internally.
+        assertEquals("https://api.ehealthwares.com/emr", prod.emrBaseUrl)
+        assertEquals("https://api.ehealthwares.com/conversation", prod.conversationBaseUrl)
         assertEquals(ServerEnvironment.PRODUCTION, prod.serverEnvironment)
     }
 

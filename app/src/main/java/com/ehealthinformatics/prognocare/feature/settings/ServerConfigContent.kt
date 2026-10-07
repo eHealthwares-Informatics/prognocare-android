@@ -194,8 +194,9 @@ fun ServerConfigContent(
 
             Spacer(modifier = Modifier.height(Spacing.xs))
             Text(
-                text = "Production uses api.ehealthwares.com + conversation.ehealthwares.com. " +
-                    "Development uses the local/LAN defaults.",
+                text = "Production uses api.ehealthwares.com/emr and " +
+                    "api.ehealthwares.com/conversation. Development uses LAN defaults " +
+                    "(base URL includes /api).",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
