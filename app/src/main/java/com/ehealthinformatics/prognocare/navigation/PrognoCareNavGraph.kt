@@ -99,6 +99,7 @@ import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorAppointm
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPatientListScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPatientDetailScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.nurse.NurseDashboardScreen
+import com.ehealthinformatics.prognocare.feature.dashboard.nurse.VitalsListScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.nurse.VitalsRecordingScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.nurse.MedicationAdministrationScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.nurse.NurseCheckInScreen
@@ -541,6 +542,7 @@ fun PrognoCareNavGraph(
             composable(NurseRoutes.DASHBOARD) {
                 NurseDashboardScreen(
                     onNavigateToVitals = { navController.navigate(NurseRoutes.VITALS) },
+                    onNavigateToRecordVitals = { navController.navigate(NurseRoutes.VITALS_RECORD) },
                     onNavigateToMedications = { navController.navigate(NurseRoutes.MEDICATIONS) },
                     onNavigateToCheckIn = { navController.navigate(NurseRoutes.CHECKIN) },
                     onNavigateToTasks = { navController.navigate(NurseRoutes.TASKS) },
@@ -550,7 +552,15 @@ fun PrognoCareNavGraph(
                 )
             }
 
+            // Vitals list → FAB opens the recording form
             composable(NurseRoutes.VITALS) {
+                VitalsListScreen(
+                    onBack = { navController.popBackStack() },
+                    onRecordVitals = { navController.navigate(NurseRoutes.VITALS_RECORD) },
+                )
+            }
+
+            composable(NurseRoutes.VITALS_RECORD) {
                 VitalsRecordingScreen(
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
