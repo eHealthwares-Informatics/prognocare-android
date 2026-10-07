@@ -236,7 +236,7 @@ fun NurseDashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         DashboardKpiCard(
-                            title = "Meds Due",
+                            title = "Visits",
                             value = "${state.medsToAdminister}",
                             icon = Icons.Outlined.MedicalServices,
                             iconTint = MaterialTheme.colorScheme.error,
@@ -245,12 +245,12 @@ fun NurseDashboardScreen(
                             modifier = Modifier.weight(1f),
                         )
                         DashboardKpiCard(
-                            title = "Completed",
+                            title = "Admissions",
                             value = "${state.completedToday}",
                             icon = Icons.Default.CheckCircle,
                             iconTint = AppThemeColors.current.kpiGreen,
                             iconBg = AppThemeColors.current.kpiGreenLight,
-                            onClick = { /* completed */ },
+                            onClick = { /* admissions */ },
                             modifier = Modifier.weight(1f),
                         )
                     }
