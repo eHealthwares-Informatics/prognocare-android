@@ -1,13 +1,14 @@
 package com.ehealthinformatics.prognocare.feature.settings
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -35,6 +36,8 @@ fun SettingsScreen(
     val config by viewModel.config.collectAsState()
     val isVerifying by viewModel.isVerifying.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
+    val dateRangeSaving by viewModel.dateRangeSaving.collectAsState()
+    val dateRangeMessage by viewModel.dateRangeMessage.collectAsState()
 
     Scaffold(
         topBar = {
@@ -66,30 +69,38 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(Spacing.base),
+            verticalArrangement = Arrangement.spacedBy(Spacing.base),
         ) {
             ServerConfigContent(
                 config = config,
-                onSave = { emr, conv, channel ->
-                    viewModel.saveConfig(emr, conv, channel)
+                onSave = { emr, conv, channel, env ->
+                    viewModel.saveConfig(emr, conv, channel, env)
                 },
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
                 saveResult = saveResult,
-                modifier = Modifier.weight(0f),
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(modifier = Modifier.height(Spacing.xl))
+            QueryDateRangeContent(
+                config = config,
+                onSave = { period -> viewModel.saveQueryRange(period) },
+                isSaving = dateRangeSaving,
+                saveMessage = dateRangeMessage,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Box(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Web channel ID identifies the clinic's WhatsApp/web " +
-                        "channel in the Conversation Engine. You normally do not need to change it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.sm),
-                )
-            }
+            Text(
+                text = "Web channel ID identifies the clinic's WhatsApp/web " +
+                    "channel in the Conversation Engine. You normally do not need to change it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.sm),
+            )
+
+            Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
 }

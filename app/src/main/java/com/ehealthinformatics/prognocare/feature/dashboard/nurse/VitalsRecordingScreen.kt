@@ -251,6 +251,12 @@ fun VitalsRecordingScreen(
                         return@Button
                     }
                     scope.launch {
+                        // Form submissions key on the patient **MRN**
+                        // (`Patient.patientId`), same as visits/encounters —
+                        // using the row UUID makes vitals invisible to
+                        // encounter screens that filter by encounter.patientId.
+                        val mrn = patient.patientId.ifBlank { patient.id }
+                        val link = viewModel.resolveVisitLink(mrn)
                         // Keyed by clinical concept; the schema mapper translates
                         // them to whatever keys this facility's VITALS form uses.
                         val data: Map<String, Any?> = buildMap {
@@ -266,8 +272,10 @@ fun VitalsRecordingScreen(
                         }
                         when (val result = viewModel.submitVitals(
                             form = form,
-                            patientId = patient.id,
+                            patientMrn = mrn,
                             raw = data,
+                            visitId = link.visitId,
+                            encounterId = link.encounterId,
                         )) {
                             is com.ehealthinformatics.prognocare.feature.dashboard.nurse.VitalsSaveResult.Success -> {
                                 snackbarHostState.showSnackbar("Vitals recorded successfully")

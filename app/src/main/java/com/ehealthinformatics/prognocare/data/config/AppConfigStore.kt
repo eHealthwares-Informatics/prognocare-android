@@ -20,8 +20,9 @@ import kotlinx.coroutines.flow.stateIn
 val Context.appConfigDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_config")
 
 /**
- * Runtime config store for server URLs. Backed by DataStore for persistence
- * but kept as an in-memory StateFlow so clients can rebuild on change.
+ * Runtime config store for server URLs + query range period. Backed by
+ * DataStore for persistence but kept as an in-memory StateFlow so clients
+ * can rebuild on change.
  */
 class AppConfigStore(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -34,6 +35,13 @@ class AppConfigStore(private val context: Context) {
                     emrBaseUrl = prefs[Keys.EMR_BASE_URL] ?: emrBaseUrl,
                     conversationBaseUrl = prefs[Keys.CONVERSATION_BASE_URL] ?: conversationBaseUrl,
                     webChannelCode = prefs[Keys.WEB_CHANNEL_CODE] ?: webChannelCode,
+                    queryRange = prefs[Keys.QUERY_RANGE]
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { QueryRangePeriod.fromId(it) },
+                    serverEnvironment = prefs[Keys.SERVER_ENV]
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { ServerEnvironment.fromId(it) }
+                        ?: ServerEnvironment.DEVELOPMENT,
                 )
             }
         }
@@ -44,6 +52,8 @@ class AppConfigStore(private val context: Context) {
             prefs[Keys.EMR_BASE_URL] = config.emrBaseUrl
             prefs[Keys.CONVERSATION_BASE_URL] = config.conversationBaseUrl
             prefs[Keys.WEB_CHANNEL_CODE] = config.webChannelCode
+            prefs[Keys.QUERY_RANGE] = config.queryRange?.id.orEmpty()
+            prefs[Keys.SERVER_ENV] = config.serverEnvironment.id
         }
     }
 
@@ -57,6 +67,8 @@ class AppConfigStore(private val context: Context) {
         val EMR_BASE_URL = stringPreferencesKey("emr_base_url")
         val CONVERSATION_BASE_URL = stringPreferencesKey("conversation_base_url")
         val WEB_CHANNEL_CODE = stringPreferencesKey("web_channel_code")
+        val QUERY_RANGE = stringPreferencesKey("query_range")
+        val SERVER_ENV = stringPreferencesKey("server_environment")
     }
 
     companion object {

@@ -36,7 +36,10 @@ object DoctorRoutes {
 
 object NurseRoutes {
     const val DASHBOARD = "nurse/dashboard"
+    /** Vitals history list (FAB opens the recording form). */
     const val VITALS = "nurse/vitals"
+    /** Vitals recording form. */
+    const val VITALS_RECORD = "nurse/vitals/record"
     const val PATIENT_LIST = "nurse/patients"
     const val CHECKIN = "nurse/checkin"
     const val MEDICATIONS = "nurse/medications"

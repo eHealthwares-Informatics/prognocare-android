@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.auth.SessionStore
 import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.data.config.AppConfigStore
+import com.ehealthinformatics.prognocare.data.config.withServerEnvironment
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.MeResponse
 import com.ehealthinformatics.prognocare.feature.splash.SplashViewModel
@@ -41,26 +42,37 @@ class UserProfileViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), configStore.config.value)
 
     init {
-        loadProfile()
+        // Show the profile screen immediately from local session + role seed;
+        // network-dependent fields refresh in the background without blocking.
+        val role = SessionStore.getRole(context)
+            ?: SplashViewModel.loadRole(context)
+            ?: UserRole.Doctor
+        _state.value = UserProfileState(
+            isLoading = false,
+            isRefreshing = true,
+            profile = localProfile(role),
+        )
+        refreshProfile(role)
     }
 
-    private fun loadProfile() {
+    private fun refreshProfile(role: UserRole) {
         viewModelScope.launch {
-            val role = SessionStore.getRole(context) ?: SplashViewModel.loadRole(context) ?: UserRole.Doctor
             val profile = loadProfileFromApi(role)
-            _state.update { it.copy(isLoading = false, profile = profile) }
+            _state.update {
+                it.copy(isRefreshing = false, profile = profile ?: it.profile)
+            }
         }
     }
 
     /**
      * Loads the signed-in identity via GET /api/auth/me plus the linked staff
      * record (GET /api/staff?userId=…) when one exists. Falls back to the
-     * role-based demo profile when the backend is unreachable.
+     * role-based local profile when the backend is unreachable.
      */
-    private suspend fun loadProfileFromApi(role: UserRole): UserProfile {
+    private suspend fun loadProfileFromApi(role: UserRole): UserProfile? {
         val me = runCatching { fetchMe() }.getOrNull()
         val staff = me?.let { runCatching { fetchMyStaff(it.id) }.getOrNull() }
-        if (me == null && staff == null) return getMockProfile(role)
+        if (me == null && staff == null) return null
         return UserProfile(
             id = staff?.id ?: me?.id.orEmpty(),
             name = staff?.let { "${it.firstName} ${it.lastName}".trim() }
@@ -72,6 +84,24 @@ class UserProfileViewModel @Inject constructor(
             facility = SessionStore.getStaffLocation(context).orEmpty().ifBlank { "PrognoCare" },
             employeeId = staff?.staffNumber,
             joinDate = staff?.hireDate,
+        )
+    }
+
+    /** Instant first-frame profile from session + role (no network). */
+    private fun localProfile(role: UserRole): UserProfile {
+        val fallback = getMockProfile(role)
+        val name = SessionStore.getStaffName(context) ?: fallback.name
+        return UserProfile(
+            id = SessionStore.getStaffId(context) ?: SessionStore.getUserId(context) ?: fallback.id,
+            name = name,
+            email = fallback.email,
+            phone = fallback.phone,
+            role = role,
+            department = fallback.department,
+            facility = SessionStore.getStaffLocation(context)
+                .orEmpty().ifBlank { fallback.facility },
+            employeeId = fallback.employeeId,
+            joinDate = fallback.joinDate,
         )
     }
 
@@ -87,14 +117,26 @@ class UserProfileViewModel @Inject constructor(
         return response.body()?.data?.firstOrNull()
     }
 
-    fun saveServerConfig(emr: String, conversation: String, webChannelCode: String) {
+    fun saveServerConfig(
+        emr: String,
+        conversation: String,
+        webChannelCode: String,
+        environment: com.ehealthinformatics.prognocare.data.config.ServerEnvironment? = null,
+    ) {
         viewModelScope.launch {
+            val current = configStore.config.value
+            val env = environment ?: current.serverEnvironment
             configStore.updateConfig(
-                configStore.config.value.copy(
-                    emrBaseUrl = emr,
-                    conversationBaseUrl = conversation,
-                    webChannelCode = webChannelCode,
-                ),
+                current
+                    .withServerEnvironment(env)
+                    .copy(
+                        emrBaseUrl = emr.trim().trimEnd('/').ifEmpty { current.emrBaseUrl }.let {
+                            if (it.endsWith("/")) it else "$it/"
+                        },
+                        conversationBaseUrl = conversation.trim().trimEnd('/')
+                            .ifEmpty { current.conversationBaseUrl },
+                        webChannelCode = webChannelCode.trim().ifEmpty { current.webChannelCode },
+                    ),
             )
         }
     }

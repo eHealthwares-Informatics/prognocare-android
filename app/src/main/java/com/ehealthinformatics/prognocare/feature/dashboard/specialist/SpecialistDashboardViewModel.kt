@@ -100,7 +100,7 @@ class SpecialistDashboardViewModel @Inject constructor(
                 val staffId = SessionStore.getStaffId(context)
 
                 val myAppointments = appointmentsRepository.list(
-                    AppointmentQuery(date = today.toString(), providerId = staffId, limit = 50),
+                    AppointmentQuery(providerId = staffId, limit = 50, defaultToday = true),
                 )
                 val myEncounters = runCatching {
                     emrRepository.encounters(limit = 100).filter { it.providerId == staffId }

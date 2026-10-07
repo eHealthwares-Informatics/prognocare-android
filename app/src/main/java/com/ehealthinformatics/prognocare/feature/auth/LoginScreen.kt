@@ -533,8 +533,8 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(Spacing.md))
                     ServerConfigContent(
                         config = config,
-                        onSave = { emr, conv, channel ->
-                            settingsViewModel.saveConfig(emr, conv, channel)
+                        onSave = { emr, conv, channel, env ->
+                            settingsViewModel.saveConfig(emr, conv, channel, env)
                         },
                         onReset = { settingsViewModel.resetToDefaults() },
                         isVerifying = isVerifying,

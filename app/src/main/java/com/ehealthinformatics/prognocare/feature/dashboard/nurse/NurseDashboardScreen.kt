@@ -64,7 +64,10 @@ import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NurseDashboardScreen(
+    /** Opens the vitals list. */
     onNavigateToVitals: () -> Unit,
+    /** Opens the vitals recording form directly (dashboard FAB). */
+    onNavigateToRecordVitals: () -> Unit = onNavigateToVitals,
     onNavigateToMedications: () -> Unit,
     onNavigateToCheckIn: () -> Unit,
     onNavigateToTasks: () -> Unit,
@@ -78,7 +81,7 @@ fun NurseDashboardScreen(
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onNavigateToVitals,
+                onClick = onNavigateToRecordVitals,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(Spacing.lg),
@@ -94,7 +97,7 @@ fun NurseDashboardScreen(
         },
     ) { innerPadding ->
         PullToRefreshBox(
-            isRefreshing = state.isLoading,
+            isRefreshing = state.isRefreshing || state.isLoading,
             onRefresh = { viewModel.retry() },
         ) {
         LazyColumn(
@@ -305,7 +308,7 @@ fun NurseDashboardScreen(
                         )
                         DashboardQuickAction(
                             icon = Icons.Outlined.MedicalServices,
-                            label = "Administer Meds",
+                            label = "Meds",
                             iconTint = MaterialTheme.colorScheme.error,
                             iconBg = MaterialTheme.colorScheme.errorContainer,
                             onClick = onNavigateToMedications,
