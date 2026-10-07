@@ -8,6 +8,7 @@ import com.ehealthinformatics.prognocare.data.remote.api.FormApi
 import com.ehealthinformatics.prognocare.data.remote.api.HealthApi
 import com.ehealthinformatics.prognocare.data.remote.api.LocationApi
 import com.ehealthinformatics.prognocare.data.remote.api.MedicationApi
+import com.ehealthinformatics.prognocare.data.remote.api.NotificationApi
 import com.ehealthinformatics.prognocare.data.remote.api.PatientApi
 import com.ehealthinformatics.prognocare.data.remote.api.PaymentProviderApi
 import com.ehealthinformatics.prognocare.data.remote.api.RequestApi
@@ -50,6 +51,7 @@ data class ApiBundle(
     val authApi: AuthApi,
     val referralApi: ReferralApi,
     val medicationApi: MedicationApi,
+    val notificationApi: NotificationApi,
 )
 
 @Singleton
@@ -103,6 +105,7 @@ class RetrofitClient @Inject constructor(
             authApi = retrofit.create(AuthApi::class.java),
             referralApi = retrofit.create(ReferralApi::class.java),
             medicationApi = retrofit.create(MedicationApi::class.java),
+            notificationApi = retrofit.create(NotificationApi::class.java),
         )
     }
 

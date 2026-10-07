@@ -134,6 +134,12 @@ object ChatRoutes {
     fun conversationDetail(conversationId: String) = "chat/$conversationId"
 }
 
+// ── Notifications (shared across all roles) ───────────────────
+
+object NotificationRoutes {
+    const val NOTIFICATIONS = "notifications"
+}
+
 // ── Profile (shared across all roles) ──────────────────────────
 
 object ProfileRoutes {

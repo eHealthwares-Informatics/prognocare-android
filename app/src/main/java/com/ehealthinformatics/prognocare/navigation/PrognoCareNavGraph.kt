@@ -91,6 +91,7 @@ import com.ehealthinformatics.prognocare.feature.forms.FormPickerScreen
 import com.ehealthinformatics.prognocare.feature.requests.CreateRequestScreen
 import com.ehealthinformatics.prognocare.feature.requests.RequestDetailScreen
 import com.ehealthinformatics.prognocare.feature.requests.RequestsListScreen
+import com.ehealthinformatics.prognocare.feature.notifications.NotificationsScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorDashboardScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorEncounterScreen
 import com.ehealthinformatics.prognocare.feature.dashboard.doctor.DoctorPrescriptionScreen
@@ -364,6 +365,9 @@ fun PrognoCareNavGraph(
                     onNavigateToClinicalNote = {
                         navController.navigate(FormsRoutes.picker())
                     },
+                    onNavigateToNotifications = {
+                        navController.navigate(NotificationRoutes.NOTIFICATIONS)
+                    },
                 )
             }
 
@@ -446,7 +450,19 @@ fun PrognoCareNavGraph(
                 )
             }
 
-            // Chat
+            // ── Notifications (shared) ────────────────────────
+            composable(NotificationRoutes.NOTIFICATIONS) {
+                NotificationsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenRequest = { requestId ->
+                        navController.navigate(DoctorRoutes.requestDetail(requestId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+
+            // ── Chat ──────────────────────────────────────────
             composable(ChatRoutes.CONVERSATIONS) {
                 ConversationListScreen(
                     onConversationClick = { id -> navController.navigate(ChatRoutes.conversationDetail(id)) },
