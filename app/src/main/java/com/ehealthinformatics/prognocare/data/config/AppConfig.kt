@@ -49,17 +49,18 @@ enum class ServerEnvironment(val id: String, val label: String) {
      * `/conversation/...` (no extra `api/` segment). Health:
      * - EMR: `https://api.ehealthwares.com/emr/health`
      * - Conversation: `https://api.ehealthwares.com/conversation/health`
+     * Trailing slash required by Retrofit.
      */
     val emrBaseUrl: String
         get() = when (this) {
-            PRODUCTION -> "https://api.ehealthwares.com/emr"
+            PRODUCTION -> "https://api.ehealthwares.com/emr/"
             DEVELOPMENT -> AppConfigStore.DEFAULT_EMR_URL
         }
 
     val conversationBaseUrl: String
         get() = when (this) {
             // conversation.ehealthwares.com serves the web SPA, not the API.
-            PRODUCTION -> "https://api.ehealthwares.com/conversation"
+            PRODUCTION -> "https://api.ehealthwares.com/conversation/"
             DEVELOPMENT -> AppConfigStore.DEFAULT_CONVERSATION_URL
         }
 
@@ -128,14 +129,15 @@ data class QueryDateRange(
 }
 
 fun AppConfig.withEmrBaseUrl(raw: String): AppConfig {
-    val normalized = raw.trim().trimEnd('/').ifEmpty { emrBaseUrl }
+    val normalized = raw.trim().trimEnd('/').ifEmpty { emrBaseUrl.trimEnd('/') }
     val withSlash = if (normalized.endsWith("/")) normalized else "$normalized/"
     return copy(emrBaseUrl = withSlash)
 }
 
 fun AppConfig.withConversationBaseUrl(raw: String): AppConfig {
-    val normalized = raw.trim().trimEnd('/').ifEmpty { conversationBaseUrl }
-    return copy(conversationBaseUrl = normalized)
+    val normalized = raw.trim().trimEnd('/').ifEmpty { conversationBaseUrl.trimEnd('/') }
+    val withSlash = if (normalized.endsWith("/")) normalized else "$normalized/"
+    return copy(conversationBaseUrl = withSlash)
 }
 
 fun AppConfig.withWebChannelCode(raw: String): AppConfig {

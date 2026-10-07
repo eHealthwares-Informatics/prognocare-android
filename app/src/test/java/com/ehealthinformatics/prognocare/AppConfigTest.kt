@@ -46,8 +46,9 @@ class AppConfigTest {
     fun `production environment fills ehealthwares gateway urls`() {
         val prod = config.withServerEnvironment(ServerEnvironment.PRODUCTION)
         // Gateway strips /emr and /conversation; Nest serves /api internally.
-        assertEquals("https://api.ehealthwares.com/emr", prod.emrBaseUrl)
-        assertEquals("https://api.ehealthwares.com/conversation", prod.conversationBaseUrl)
+        // Trailing slash required by Retrofit.
+        assertEquals("https://api.ehealthwares.com/emr/", prod.emrBaseUrl)
+        assertEquals("https://api.ehealthwares.com/conversation/", prod.conversationBaseUrl)
         assertEquals(ServerEnvironment.PRODUCTION, prod.serverEnvironment)
     }
 

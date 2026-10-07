@@ -83,7 +83,7 @@ class RetrofitClient @Inject constructor(
         .build()
 
     private fun buildRetrofit(baseUrl: String): Retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
+        .baseUrl(baseUrl.trimEnd('/') + "/")
         .client(buildHttpClient())
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
