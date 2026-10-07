@@ -97,6 +97,20 @@ class DoctorEncounterViewModel @Inject constructor(
                     ).body()?.data.orEmpty()
                 }.getOrDefault(emptyList())
 
+                // Vitals recorded outside this encounter/visit (e.g. nurse
+                // flow before a visit was linked) are keyed by MRN only —
+                // surface them so the VitalsCard updates after mobile save.
+                val patientScopedVitals = runCatching {
+                    apis.formApi.listSubmissions(
+                        patientId = encounter.patientId,
+                        limit = 50,
+                    ).body()?.data.orEmpty()
+                }.getOrDefault(emptyList()).filter {
+                    it.formName.contains("vital", ignoreCase = true)
+                }
+
+                val vitalsSource = (submissions + patientScopedVitals).distinctBy { it.id }
+
                 val requests = runCatching {
                     apis.requestApi.list(
                         patientId = encounter.patientId,
@@ -112,7 +126,7 @@ class DoctorEncounterViewModel @Inject constructor(
                     patientName = patientName,
                     submissions = submissions,
                     requests = requests,
-                    vitals = VitalsReadings.latest(submissions),
+                    vitals = VitalsReadings.latest(vitalsSource),
                     isLoading = false,
                 )
             } catch (e: Exception) {
