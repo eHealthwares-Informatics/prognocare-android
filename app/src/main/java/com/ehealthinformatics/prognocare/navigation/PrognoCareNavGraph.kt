@@ -548,7 +548,9 @@ fun PrognoCareNavGraph(
             composable(NurseRoutes.DASHBOARD) {
                 NurseDashboardScreen(
                     onNavigateToVitals = { navController.navigate(NurseRoutes.VITALS) },
-                    onNavigateToRecordVitals = { navController.navigate(NurseRoutes.VITALS_RECORD) },
+                    // FAB opens the documentation form picker (patient + form),
+                    // not the static vitals form.
+                    onNavigateToRecordVitals = { navController.navigate(FormsRoutes.picker()) },
                     onNavigateToMedications = { navController.navigate(NurseRoutes.MEDICATIONS) },
                     onNavigateToCheckIn = { navController.navigate(NurseRoutes.CHECKIN) },
                     onNavigateToTasks = { navController.navigate(NurseRoutes.TASKS) },
