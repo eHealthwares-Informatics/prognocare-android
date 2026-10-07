@@ -97,7 +97,7 @@ fun NurseDashboardScreen(
         },
     ) { innerPadding ->
         PullToRefreshBox(
-            isRefreshing = state.isLoading,
+            isRefreshing = state.isRefreshing || state.isLoading,
             onRefresh = { viewModel.retry() },
         ) {
         LazyColumn(

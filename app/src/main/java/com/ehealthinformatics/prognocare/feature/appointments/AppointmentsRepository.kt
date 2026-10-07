@@ -1,5 +1,7 @@
 package com.ehealthinformatics.prognocare.feature.appointments
 
+import com.ehealthinformatics.prognocare.data.config.AppConfigStore
+import com.ehealthinformatics.prognocare.data.config.queryDateRange
 import com.ehealthinformatics.prognocare.data.remote.RetrofitClient
 import com.ehealthinformatics.prognocare.data.remote.models.Appointment
 import com.ehealthinformatics.prognocare.data.remote.models.CancelAppointmentDto
@@ -18,7 +20,13 @@ class ApiException(val code: Int, message: String) : Exception(message)
 data class AppointmentQuery(
     val page: Int = 1,
     val limit: Int = 50,
+    /** Explicit single-day filter; wins over the configured query range. */
     val date: String? = null,
+    /**
+     * When [date] is null and no query date-range is configured, fall back to
+     * today (dashboard default). Set false for open-ended lists.
+     */
+    val defaultToday: Boolean = false,
     val status: String? = null,
     val providerId: String? = null,
     val patientId: String? = null,
@@ -31,21 +39,39 @@ data class AppointmentQuery(
  * Data access for appointments (and the patient/provider lookups needed to
  * schedule one). Reads the current [RetrofitClient.ApiBundle] on every call so
  * runtime base-URL changes are picked up immediately.
+ *
+ * Date resolution order for list queries:
+ * 1. Explicit [AppointmentQuery.date]
+ * 2. Settings query date range (`BETWEEN|start|end` DSL)
+ * 3. Today, when [AppointmentQuery.defaultToday] is true
  */
 @Singleton
 class AppointmentsRepository @Inject constructor(
     private val retrofitClient: RetrofitClient,
+    private val configStore: AppConfigStore,
 ) {
 
     /** Today's date as `yyyy-MM-dd` in the device timezone. */
     fun today(): String =
         java.time.LocalDate.now().toString()
 
+    /**
+     * Resolves the EMR `date` query param from explicit filter → configured
+     * query range → optional today fallback.
+     */
+    fun resolveDateParam(explicit: String?, defaultToday: Boolean = false): String? {
+        if (explicit != null) return explicit
+        val fromRange = configStore.config.value.queryDateRange()?.toAppointmentDateParam()
+        if (fromRange != null) return fromRange
+        return if (defaultToday) today() else null
+    }
+
     suspend fun list(query: AppointmentQuery = AppointmentQuery()): List<Appointment> {
+        val dateParam = resolveDateParam(query.date, query.defaultToday)
         val response = retrofitClient.apis.first().appointmentApi.list(
             page = query.page,
             limit = query.limit,
-            date = query.date,
+            date = dateParam,
             status = query.status,
             providerId = query.providerId,
             patientId = query.patientId,

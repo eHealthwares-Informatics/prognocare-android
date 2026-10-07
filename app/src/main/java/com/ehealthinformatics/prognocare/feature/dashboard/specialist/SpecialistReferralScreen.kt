@@ -464,7 +464,7 @@ private fun CreateReferralDialog(
                         LazyColumn(modifier = Modifier.fillMaxWidth().height(160.dp)) {
                             items(state.specialists, key = { it.id }) { specialist ->
                                 Text(
-                                    text = specialist.displayName,
+                                    text = specialist.displayWithDepartment,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -479,7 +479,7 @@ private fun CreateReferralDialog(
                         }
                     } else {
                         Text(
-                            state.selectedSpecialist!!.displayName,
+                            state.selectedSpecialist!!.displayWithDepartment,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                         )

@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -35,6 +36,8 @@ fun SettingsScreen(
     val config by viewModel.config.collectAsState()
     val isVerifying by viewModel.isVerifying.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
+    val dateRangeSaving by viewModel.dateRangeSaving.collectAsState()
+    val dateRangeMessage by viewModel.dateRangeMessage.collectAsState()
 
     Scaffold(
         topBar = {
@@ -66,7 +69,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(Spacing.base),
+            verticalArrangement = Arrangement.spacedBy(Spacing.base),
         ) {
             ServerConfigContent(
                 config = config,
@@ -76,11 +81,17 @@ fun SettingsScreen(
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
                 saveResult = saveResult,
-                // weight must be > 0; 0f throws IllegalArgumentException
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(modifier = Modifier.height(Spacing.xl))
+            QueryDateRangeContent(
+                config = config,
+                onSave = { start, end -> viewModel.saveQueryDateRange(start, end) },
+                onClear = { viewModel.clearQueryDateRange() },
+                isSaving = dateRangeSaving,
+                saveMessage = dateRangeMessage,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Text(
                 text = "Web channel ID identifies the clinic's WhatsApp/web " +
@@ -89,6 +100,8 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Spacing.sm),
             )
+
+            Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
 }

@@ -8,6 +8,7 @@ import com.ehealthinformatics.prognocare.data.config.ConnectionCheck
 import com.ehealthinformatics.prognocare.data.config.ServerConfigVerifier
 import com.ehealthinformatics.prognocare.data.config.withConversationBaseUrl
 import com.ehealthinformatics.prognocare.data.config.withEmrBaseUrl
+import com.ehealthinformatics.prognocare.data.config.withQueryDateRange
 import com.ehealthinformatics.prognocare.data.config.withWebChannelCode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,12 @@ class SettingsViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult?>(null)
     val saveResult: StateFlow<SaveResult?> = _saveResult.asStateFlow()
 
+    private val _dateRangeSaving = MutableStateFlow(false)
+    val dateRangeSaving: StateFlow<Boolean> = _dateRangeSaving.asStateFlow()
+
+    private val _dateRangeMessage = MutableStateFlow<String?>(null)
+    val dateRangeMessage: StateFlow<String?> = _dateRangeMessage.asStateFlow()
+
     fun saveConfig(
         emrBaseUrl: String,
         conversationBaseUrl: String,
@@ -65,10 +72,42 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Saves the global query date-range used by appointment/dashboard queries.
+     * Pass nulls to clear (queries fall back to today).
+     */
+    fun saveQueryDateRange(start: String?, end: String?) {
+        viewModelScope.launch {
+            _dateRangeSaving.value = true
+            _dateRangeMessage.value = null
+            try {
+                val current = configStore.config.value
+                configStore.updateConfig(current.withQueryDateRange(start, end))
+                _dateRangeMessage.value = when {
+                    start == null && end == null ->
+                        "Query date range cleared — queries use today."
+                    else ->
+                        "Query date range saved — appointment queries use this window."
+                }
+            } catch (e: Exception) {
+                _dateRangeMessage.value = e.message ?: "Could not save date range"
+            } finally {
+                _dateRangeSaving.value = false
+            }
+        }
+    }
+
+    fun clearQueryDateRange() = saveQueryDateRange(null, null)
+
+    fun dismissDateRangeMessage() {
+        _dateRangeMessage.value = null
+    }
+
     fun resetToDefaults() {
         viewModelScope.launch {
             _isVerifying.value = true
             _saveResult.value = null
+            _dateRangeMessage.value = null
             try {
                 configStore.resetToDefaults()
                 _saveResult.value = SaveResult(saved = true)

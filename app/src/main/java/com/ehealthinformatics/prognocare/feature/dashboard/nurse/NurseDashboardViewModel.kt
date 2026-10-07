@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ehealthinformatics.prognocare.data.auth.SessionStore
 import com.ehealthinformatics.prognocare.feature.appointments.AppointmentQuery
 import com.ehealthinformatics.prognocare.feature.appointments.AppointmentsRepository
+import com.ehealthinformatics.prognocare.feature.forms.VitalsReadings
 import com.ehealthinformatics.prognocare.feature.records.EmrRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -44,21 +45,56 @@ class NurseDashboardViewModel @Inject constructor(
     }
 
     private fun loadDashboardData() {
-        _state.value = _state.value.copy(isLoading = true, error = null)
+        // Keep previous numbers visible while refreshing so the UI does not flash zeros.
+        val refreshing = _state.value.isLoading || _state.value.taskQueue.isNotEmpty()
+        _state.value = _state.value.copy(
+            isLoading = !refreshing,
+            isRefreshing = refreshing,
+            error = null,
+        )
         viewModelScope.launch {
             try {
-                val today = LocalDate.now().toString()
+                // Appointment window: explicit filter → settings date range → today.
+                val todayAppointments = appointmentsRepository.list(
+                    AppointmentQuery(limit = 100, defaultToday = true),
+                )
 
-                // Today's scheduled appointments drive the check-in queue.
-                val todayAppointments = appointmentsRepository.list(AppointmentQuery(date = today, limit = 50))
-                val activeVisits = runCatching {
-                    emrRepository.encounters(limit = 50)
+                // VITALS documentation submissions (patient MRN keyed).
+                val vitalsSubmissions = runCatching {
+                    emrRepository.formSubmissions(limit = 100)
                 }.getOrDefault(emptyList())
+                    .filter { it.formName.contains("vital", ignoreCase = true) }
+                    .filter { it.status != "DRAFT" }
 
-                // Open medication requests (PRESCRIPTION not yet completed).
+                val vitalsByMrn = vitalsSubmissions
+                    .groupBy { it.patientId }
+                val vitalsMrns = vitalsByMrn.keys
+
+                // Open PRESCRIPTION requests + due medications.
                 val medRequests = runCatching {
                     emrRepository.requests(requestType = "PRESCRIPTION", limit = 50)
                 }.getOrDefault(emptyList())
+                val dueMeds = runCatching {
+                    emrRepository.medications(limit = 100)
+                }.getOrDefault(emptyList()).filter { it.isDue }
+
+                val checkedInStatuses = listOf("CHECKED_IN", "IN_PROGRESS")
+                val openStatuses = listOf("REQUESTED", "IN_PROGRESS")
+                val closedStatuses = listOf("COMPLETED", "CANCELLED", "NO_SHOW")
+
+                val checkedInAppts = todayAppointments.filter { it.status in checkedInStatuses }
+                val completedAppts = todayAppointments.filter { it.status == "COMPLETED" }
+
+                // Vitals pending = checked-in patients without a VITALS submission.
+                val vitalsPending = checkedInAppts.count { apt ->
+                    apt.patientId !in vitalsMrns
+                }
+
+                val medsDue = if (dueMeds.isNotEmpty()) {
+                    dueMeds.size
+                } else {
+                    medRequests.count { it.isOpen }
+                }
 
                 val checkIns = todayAppointments.map { apt ->
                     NurseCheckIn(
@@ -68,37 +104,71 @@ class NurseDashboardViewModel @Inject constructor(
                         appointmentTime = apt.startTime,
                         appointmentType = apt.typeDisplay,
                         providerName = apt.providerName ?: "—",
-                        isCheckedIn = apt.status in listOf("CHECKED_IN", "IN_PROGRESS", "COMPLETED"),
-                        vitalsComplete = false,
+                        isCheckedIn = apt.status in checkedInStatuses ||
+                            apt.status == "COMPLETED",
+                        vitalsComplete = apt.patientId in vitalsMrns,
                     )
                 }
 
                 val tasks = todayAppointments
-                    .filter { it.status !in listOf("COMPLETED", "CANCELLED", "NO_SHOW") }
+                    .filter { it.status !in closedStatuses }
                     .map { apt ->
+                        val vitalsDone = apt.patientId in vitalsMrns
                         NurseTask(
                             id = apt.id,
                             patientName = apt.patientName,
                             patientId = apt.patientId,
-                            taskType = if (apt.status in listOf("CHECKED_IN", "IN_PROGRESS")) {
-                                NurseTaskType.VITALS
+                            taskType = if (apt.status in checkedInStatuses) {
+                                if (vitalsDone) NurseTaskType.MEDICATION else NurseTaskType.VITALS
                             } else {
                                 NurseTaskType.CHECK_IN
                             },
-                            description = if (apt.status in listOf("CHECKED_IN", "IN_PROGRESS")) {
-                                "Record pre-consultation vitals"
-                            } else {
-                                "Check in for ${apt.typeDisplay.lowercase()}"
+                            description = when {
+                                apt.status in checkedInStatuses && !vitalsDone ->
+                                    "Record pre-consultation vitals"
+                                apt.status in checkedInStatuses && vitalsDone ->
+                                    "Awaiting clinician / meds"
+                                else -> "Check in for ${apt.typeDisplay.lowercase()}"
                             },
                             priority = if (apt.isUrgent) TaskPriority.URGENT else TaskPriority.NORMAL,
                             scheduledTime = apt.startTime,
                             status = when (apt.status) {
                                 "IN_PROGRESS" -> TaskStatus.IN_PROGRESS
-                                "CHECKED_IN" -> TaskStatus.IN_PROGRESS
+                                "CHECKED_IN" ->
+                                    if (vitalsDone) TaskStatus.COMPLETED else TaskStatus.IN_PROGRESS
                                 else -> TaskStatus.PENDING
                             },
                         )
                     }
+
+                // Recent vitals → display rows (newest first, cap 10).
+                val recentVitals = vitalsSubmissions
+                    .sortedByDescending { it.submittedAt ?: it.createdAt.orEmpty() }
+                    .take(10)
+                    .mapNotNull { submission ->
+                        val readings = VitalsReadings.from(submission) ?: return@mapNotNull null
+                        // Parse BP "120/80 mmHg" back into parts for VitalsRecord.
+                        val bp = readings.bloodPressure
+                        val bpParts = bp?.split("/")?.map { it.trim() }
+                        VitalsRecord(
+                            id = submission.id,
+                            patientName = submission.patientId.ifBlank { "Patient" },
+                            recordedAt = (submission.submittedAt ?: submission.createdAt ?: "")
+                                .take(16)
+                                .replace('T', ' '),
+                            temperature = readings.temperature,
+                            bloodPressureSystolic = bpParts?.getOrNull(0)?.takeWhile { it.isDigit() },
+                            bloodPressureDiastolic = bpParts?.getOrNull(1)?.takeWhile { it.isDigit() },
+                            heartRate = readings.heartRate,
+                            respiratoryRate = readings.respiratoryRate,
+                            oxygenSaturation = readings.oxygenSaturation,
+                            weight = readings.weight,
+                            height = readings.height,
+                            recordedBy = readings.recordedBy.orEmpty(),
+                        )
+                    }
+
+                val pendingTasks = tasks.count { it.status != TaskStatus.COMPLETED }
 
                 _state.value = NurseDashboardState(
                     greeting = when (LocalDateTime.now().hour) {
@@ -108,21 +178,24 @@ class NurseDashboardViewModel @Inject constructor(
                     },
                     nurseName = SessionStore.getStaffName(context) ?: "Nurse",
                     todayDate = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
-                    patientsCheckedIn = todayAppointments.count {
-                        it.status in listOf("CHECKED_IN", "IN_PROGRESS")
-                    },
-                    vitalsToRecord = todayAppointments.count { it.status == "CHECKED_IN" },
-                    medsToAdminister = medRequests.count { it.isOpen },
-                    pendingTasks = tasks.count { it.status != TaskStatus.COMPLETED },
-                    completedToday = todayAppointments.count { it.status == "COMPLETED" },
+                    patientsCheckedIn = checkedInAppts.size,
+                    vitalsToRecord = vitalsPending,
+                    medsToAdminister = medsDue,
+                    pendingTasks = pendingTasks,
+                    completedToday = completedAppts.size,
                     urgentTasks = tasks.count { it.priority == TaskPriority.URGENT },
                     taskQueue = tasks,
                     upcomingCheckIns = checkIns.filter { !it.isCheckedIn },
-                    recentVitals = emptyList(), // vitals live in documentation submissions
+                    recentVitals = recentVitals,
                     isLoading = false,
+                    isRefreshing = false,
                 )
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Failed to load")
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = e.message ?: "Failed to load",
+                )
             }
         }
     }

@@ -14,6 +14,7 @@ data class NurseDashboardState(
     val upcomingCheckIns: List<NurseCheckIn> = emptyList(),
     val recentVitals: List<VitalsRecord> = emptyList(),
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
 )
 

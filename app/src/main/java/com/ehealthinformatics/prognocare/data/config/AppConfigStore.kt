@@ -20,8 +20,9 @@ import kotlinx.coroutines.flow.stateIn
 val Context.appConfigDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_config")
 
 /**
- * Runtime config store for server URLs. Backed by DataStore for persistence
- * but kept as an in-memory StateFlow so clients can rebuild on change.
+ * Runtime config store for server URLs + query date range. Backed by
+ * DataStore for persistence but kept as an in-memory StateFlow so clients
+ * can rebuild on change.
  */
 class AppConfigStore(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -34,6 +35,10 @@ class AppConfigStore(private val context: Context) {
                     emrBaseUrl = prefs[Keys.EMR_BASE_URL] ?: emrBaseUrl,
                     conversationBaseUrl = prefs[Keys.CONVERSATION_BASE_URL] ?: conversationBaseUrl,
                     webChannelCode = prefs[Keys.WEB_CHANNEL_CODE] ?: webChannelCode,
+                    queryDateStart = prefs[Keys.QUERY_DATE_START]
+                        ?.takeIf { it.isNotBlank() },
+                    queryDateEnd = prefs[Keys.QUERY_DATE_END]
+                        ?.takeIf { it.isNotBlank() },
                 )
             }
         }
@@ -44,6 +49,9 @@ class AppConfigStore(private val context: Context) {
             prefs[Keys.EMR_BASE_URL] = config.emrBaseUrl
             prefs[Keys.CONVERSATION_BASE_URL] = config.conversationBaseUrl
             prefs[Keys.WEB_CHANNEL_CODE] = config.webChannelCode
+            // Empty string = cleared (DataStore has no null for string keys).
+            prefs[Keys.QUERY_DATE_START] = config.queryDateStart.orEmpty()
+            prefs[Keys.QUERY_DATE_END] = config.queryDateEnd.orEmpty()
         }
     }
 
@@ -57,6 +65,8 @@ class AppConfigStore(private val context: Context) {
         val EMR_BASE_URL = stringPreferencesKey("emr_base_url")
         val CONVERSATION_BASE_URL = stringPreferencesKey("conversation_base_url")
         val WEB_CHANNEL_CODE = stringPreferencesKey("web_channel_code")
+        val QUERY_DATE_START = stringPreferencesKey("query_date_start")
+        val QUERY_DATE_END = stringPreferencesKey("query_date_end")
     }
 
     companion object {
