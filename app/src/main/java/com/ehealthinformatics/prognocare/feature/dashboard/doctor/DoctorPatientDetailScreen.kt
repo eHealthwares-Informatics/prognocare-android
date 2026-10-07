@@ -69,6 +69,8 @@ fun DoctorPatientDetailScreen(
     patientId: String,
     onBack: () -> Unit,
     onOpenDocumentation: ((String) -> Unit)? = null,
+    onNewEncounter: ((String) -> Unit)? = null,
+    onNewRequest: ((String) -> Unit)? = null,
     viewModel: PatientDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -92,8 +94,12 @@ fun DoctorPatientDetailScreen(
                     }
                 },
                 actions = {
-                    // Doctors document care but do not edit patient demographics;
-                    // registration edits belong to the admin/records desk.
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -151,9 +157,15 @@ fun DoctorPatientDetailScreen(
                     when (selectedTab) {
                         0 -> OverviewTab(patient)
                         1 -> VisitsTab(state.visits)
-                        2 -> EncountersTab(state.encounters)
-                        3 -> RequestsTab(state.requests)
-                        4 -> RecordsTab(state.submissions, onRefresh = viewModel::refresh)
+                        2 -> EncountersTab(
+                            encounters = state.encounters,
+                            onNew = { onNewEncounter?.invoke(patientId) },
+                        )
+                        3 -> RequestsTab(
+                            requests = state.requests,
+                            onNew = { onNewRequest?.invoke(patientId) },
+                        )
+                        4 -> RecordsTab(state.submissions)
                     }
                 }
             }
@@ -301,40 +313,63 @@ private fun VisitsTab(visits: List<Visit>) {
 }
 
 @Composable
-private fun EncountersTab(encounters: List<Encounter>) {
-    if (encounters.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.MedicalServices,
-            title = "No recent encounters",
-            message = "Encounters for this patient will appear here",
-        )
-        return
-    }
-    LazyColumn(
-        contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        items(encounters, key = { it.id }) { encounter ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Spacing.base),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(modifier = Modifier.padding(Spacing.base)) {
-                    Text(
-                        text = encounter.typeDisplay,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = listOfNotNull(
-                            encounter.encounterDatetime?.take(10),
-                            encounter.providerName,
-                            encounter.reason,
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+private fun EncountersTab(
+    encounters: List<Encounter>,
+    onNew: () -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${encounters.size} encounter(s)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onNew) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(Spacing.xs))
+                Text("New")
+            }
+        }
+        if (encounters.isEmpty()) {
+            EmptyState(
+                icon = Icons.Default.MedicalServices,
+                title = "No recent encounters",
+                message = "Encounters for this patient will appear here",
+            )
+            return
+        }
+        LazyColumn(
+            contentPadding = PaddingValues(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            items(encounters, key = { it.id }) { encounter ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Spacing.base),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.base)) {
+                        Text(
+                            text = encounter.typeDisplay,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = listOfNotNull(
+                                encounter.encounterDatetime?.take(10),
+                                encounter.providerName,
+                                encounter.reason,
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -342,46 +377,69 @@ private fun EncountersTab(encounters: List<Encounter>) {
 }
 
 @Composable
-private fun RequestsTab(requests: List<ClinicalRequest>) {
-    if (requests.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.MedicalServices,
-            title = "No pending requests",
-            message = "Clinical requests for this patient will appear here",
-        )
-        return
-    }
-    LazyColumn(
-        contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        items(requests, key = { it.id }) { request ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Spacing.base),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(modifier = Modifier.padding(Spacing.base)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+private fun RequestsTab(
+    requests: List<ClinicalRequest>,
+    onNew: () -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${requests.size} request(s)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onNew) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(Spacing.xs))
+                Text("New")
+            }
+        }
+        if (requests.isEmpty()) {
+            EmptyState(
+                icon = Icons.Default.MedicalServices,
+                title = "No pending requests",
+                message = "Clinical requests for this patient will appear here",
+            )
+            return
+        }
+        LazyColumn(
+            contentPadding = PaddingValues(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            items(requests, key = { it.id }) { request ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Spacing.base),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.base)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = request.typeDisplay,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            RequestStatusBadge(request.status)
+                        }
                         Text(
-                            text = request.typeDisplay,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
+                            text = listOfNotNull(
+                                request.requestNumber,
+                                request.diagnosis,
+                                "${request.items.size} item(s)",
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        RequestStatusBadge(request.status)
                     }
-                    Text(
-                        text = listOfNotNull(
-                            request.requestNumber,
-                            request.diagnosis,
-                            "${request.items.size} item(s)",
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -391,28 +449,12 @@ private fun RequestsTab(requests: List<ClinicalRequest>) {
 @Composable
 private fun RecordsTab(
     submissions: List<FormSubmission>,
-    onRefresh: () -> Unit,
 ) {
-    // Refreshable: pull the documentation again on demand.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.End,
-    ) {
-        TextButton(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(Spacing.xs))
-            Text("Refresh")
-        }
-    }
     if (submissions.isEmpty()) {
         EmptyState(
             icon = Icons.Default.MedicalServices,
             title = "No records yet",
-            message = "Documentation for this patient will appear here. Tap refresh after adding documentation.",
-            actionText = "Refresh",
-            onActionClick = onRefresh,
+            message = "Documentation for this patient will appear here. Use the refresh button after adding documentation.",
         )
         return
     }

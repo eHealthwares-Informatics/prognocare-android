@@ -92,7 +92,7 @@ fun NurseDashboardScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Record Vitals", fontWeight = FontWeight.SemiBold)
+                Text("Vitals", fontWeight = FontWeight.SemiBold)
             }
         },
     ) { innerPadding ->
@@ -300,7 +300,7 @@ fun NurseDashboardScreen(
                     ) {
                         DashboardQuickAction(
                             icon = Icons.Outlined.Bloodtype,
-                            label = "Record Vitals",
+                            label = "Vitals",
                             iconTint = AppThemeColors.current.kpiBlue,
                             iconBg = AppThemeColors.current.kpiBlueLight,
                             onClick = onNavigateToVitals,
@@ -324,7 +324,7 @@ fun NurseDashboardScreen(
                         )
                         DashboardQuickAction(
                             icon = Icons.Default.TaskAlt,
-                            label = "View Tasks",
+                            label = "Tasks",
                             iconTint = AppThemeColors.current.kpiPurple,
                             iconBg = AppThemeColors.current.kpiPurpleLight,
                             onClick = onNavigateToTasks,

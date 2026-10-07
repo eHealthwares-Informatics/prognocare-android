@@ -397,6 +397,12 @@ fun PrognoCareNavGraph(
                     onOpenDocumentation = { pid ->
                         navController.navigate(FormsRoutes.picker(patientId = pid))
                     },
+                    onNewEncounter = {
+                        navController.navigate(ClinicalRoutes.ENCOUNTERS + "/new")
+                    },
+                    onNewRequest = {
+                        navController.navigate(DoctorRoutes.CREATE_REQUEST)
+                    },
                 )
             }
 

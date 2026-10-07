@@ -62,41 +62,41 @@ class AppConfigTest {
     }
 
     @Test
-    fun `query range null resolves to null (default today)`() {
+    fun `query range none resolves to null (default today)`() {
         assertNull(config.resolveQueryDateRange(LocalDate.of(2026, 10, 7)))
     }
 
     @Test
-    fun `last week resolves to 7 days ending today`() {
-        val today = LocalDate.of(2026, 10, 7)
-        val range = QueryRangePeriod.LAST_WEEK.resolve(today)
-        assertEquals("2026-10-01", range.start)
-        assertEquals("2026-10-07", range.end)
-        assertEquals("BETWEEN|2026-10-01|2026-10-07", range.toAppointmentDateParam())
+    fun `this week resolves monday to today`() {
+        val today = LocalDate.of(2026, 10, 7) // Wednesday
+        val range = QueryRangePeriod.THIS_WEEK.resolve(today)
+        assertEquals("2026-10-05", range?.start) // Monday
+        assertEquals("2026-10-07", range?.end)
+        assertEquals("BETWEEN|2026-10-05|2026-10-07", range?.toAppointmentDateParam())
     }
 
     @Test
-    fun `last month resolves to 30 days ending today`() {
+    fun `this month resolves first of month to today`() {
         val today = LocalDate.of(2026, 10, 7)
-        val range = QueryRangePeriod.LAST_MONTH.resolve(today)
-        assertEquals("2026-09-08", range.start)
-        assertEquals("2026-10-07", range.end)
+        val range = QueryRangePeriod.THIS_MONTH.resolve(today)
+        assertEquals("2026-10-01", range?.start)
+        assertEquals("2026-10-07", range?.end)
     }
 
     @Test
     fun `today range is a single day param`() {
         val today = LocalDate.of(2026, 10, 7)
         val range = QueryRangePeriod.TODAY.resolve(today)
-        assertEquals("2026-10-07", range.toAppointmentDateParam())
+        assertEquals("2026-10-07", range?.toAppointmentDateParam())
     }
 
     @Test
-    fun `withQueryRange stores period id`() {
-        val updated = config.withQueryRange(QueryRangePeriod.LAST_WEEK)
-        assertEquals(QueryRangePeriod.LAST_WEEK, updated.queryRange)
+    fun `withQueryRange stores period and none clears filter`() {
+        val updated = config.withQueryRange(QueryRangePeriod.THIS_WEEK)
+        assertEquals(QueryRangePeriod.THIS_WEEK, updated.queryRange)
         assertEquals(
-            QueryRangePeriod.LAST_WEEK,
-            updated.withQueryRange(null).queryRange,
+            QueryRangePeriod.NONE,
+            updated.withQueryRange(QueryRangePeriod.NONE).queryRange,
         )
     }
 

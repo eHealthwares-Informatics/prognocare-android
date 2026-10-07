@@ -37,7 +37,8 @@ class AppConfigStore(private val context: Context) {
                     webChannelCode = prefs[Keys.WEB_CHANNEL_CODE] ?: webChannelCode,
                     queryRange = prefs[Keys.QUERY_RANGE]
                         ?.takeIf { it.isNotBlank() }
-                        ?.let { QueryRangePeriod.fromId(it) },
+                        ?.let { QueryRangePeriod.fromId(it) }
+                        ?: QueryRangePeriod.NONE,
                     serverEnvironment = prefs[Keys.SERVER_ENV]
                         ?.takeIf { it.isNotBlank() }
                         ?.let { ServerEnvironment.fromId(it) }
