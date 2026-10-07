@@ -72,13 +72,22 @@ class NurseDashboardViewModel @Inject constructor(
                     .groupBy { it.patientId }
                 val vitalsMrns = vitalsByMrn.keys
 
-                // Open PRESCRIPTION requests + due medications.
-                val medRequests = runCatching {
-                    emrRepository.requests(requestType = "PRESCRIPTION", limit = 50)
+                // Today's visits (VisitApi).
+                val todayVisits = runCatching {
+                    retrofitClient.apis.value.visitApi.list(limit = 100).body()?.data.orEmpty()
                 }.getOrDefault(emptyList())
-                val dueMeds = runCatching {
-                    emrRepository.medications(limit = 100)
-                }.getOrDefault(emptyList()).filter { it.isDue }
+                    .filter { v ->
+                        v.startDatetime?.take(10) == LocalDate.now().toString() ||
+                            v.status == "ONGOING"
+                    }
+
+                // Active admissions (AdmissionApi, status=ADMITTED).
+                val activeAdmissions = runCatching {
+                    retrofitClient.apis.value.admissionApi.list(
+                        status = "ADMITTED",
+                        limit = 100,
+                    ).body()?.data.orEmpty()
+                }.getOrDefault(emptyList())
 
                 val checkedInStatuses = listOf("CHECKED_IN", "IN_PROGRESS")
                 val openStatuses = listOf("REQUESTED", "IN_PROGRESS")
@@ -90,12 +99,6 @@ class NurseDashboardViewModel @Inject constructor(
                 // Vitals pending = checked-in patients without a VITALS submission.
                 val vitalsPending = checkedInAppts.count { apt ->
                     apt.patientId !in vitalsMrns
-                }
-
-                val medsDue = if (dueMeds.isNotEmpty()) {
-                    dueMeds.size
-                } else {
-                    medRequests.count { it.isOpen }
                 }
 
                 val checkIns = todayAppointments.map { apt ->
@@ -194,7 +197,8 @@ class NurseDashboardViewModel @Inject constructor(
                     todayDate = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
                     patientsCheckedIn = checkedInAppts.size,
                     vitalsToRecord = vitalsPending,
-                    medsToAdminister = medsDue,
+                    visitsCount = todayVisits.size,
+                    admissionsCount = activeAdmissions.size,
                     pendingTasks = pendingTasks,
                     completedToday = completedAppts.size,
                     urgentTasks = tasks.count { it.priority == TaskPriority.URGENT },

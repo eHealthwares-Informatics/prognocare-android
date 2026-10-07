@@ -237,7 +237,7 @@ fun NurseDashboardScreen(
                     ) {
                         DashboardKpiCard(
                             title = "Visits",
-                            value = "${state.medsToAdminister}",
+                            value = "${state.visitsCount}",
                             icon = Icons.Outlined.MedicalServices,
                             iconTint = MaterialTheme.colorScheme.error,
                             iconBg = MaterialTheme.colorScheme.errorContainer,
@@ -246,7 +246,7 @@ fun NurseDashboardScreen(
                         )
                         DashboardKpiCard(
                             title = "Admissions",
-                            value = "${state.completedToday}",
+                            value = "${state.admissionsCount}",
                             icon = Icons.Default.CheckCircle,
                             iconTint = AppThemeColors.current.kpiGreen,
                             iconBg = AppThemeColors.current.kpiGreenLight,

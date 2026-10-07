@@ -6,7 +6,10 @@ data class NurseDashboardState(
     val todayDate: String = "Tuesday, Aug 18",
     val patientsCheckedIn: Int = 0,
     val vitalsToRecord: Int = 0,
-    val medsToAdminister: Int = 0,
+    /** Today's visits (from VisitApi). */
+    val visitsCount: Int = 0,
+    /** Active admissions (status=ADMITTED, from AdmissionApi). */
+    val admissionsCount: Int = 0,
     val pendingTasks: Int = 0,
     val completedToday: Int = 0,
     val urgentTasks: Int = 0,
