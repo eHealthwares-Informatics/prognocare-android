@@ -1,6 +1,6 @@
 package com.ehealthinformatics.prognocare.feature.settings
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -76,20 +76,19 @@ fun SettingsScreen(
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
                 saveResult = saveResult,
-                modifier = Modifier.weight(0f),
+                // weight must be > 0; 0f throws IllegalArgumentException
+                modifier = Modifier.weight(1f),
             )
 
             Spacer(modifier = Modifier.height(Spacing.xl))
 
-            Box(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Web channel ID identifies the clinic's WhatsApp/web " +
-                        "channel in the Conversation Engine. You normally do not need to change it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.sm),
-                )
-            }
+            Text(
+                text = "Web channel ID identifies the clinic's WhatsApp/web " +
+                    "channel in the Conversation Engine. You normally do not need to change it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.sm),
+            )
         }
     }
 }
