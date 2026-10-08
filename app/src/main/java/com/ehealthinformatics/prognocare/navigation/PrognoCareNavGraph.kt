@@ -83,6 +83,9 @@ import com.ehealthinformatics.prognocare.feature.chat.ConversationListScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalAppointmentsScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalEncountersScreen
 import com.ehealthinformatics.prognocare.feature.clinical.ClinicalVisitsScreen
+import com.ehealthinformatics.prognocare.feature.clinical.AdmissionsListScreen
+import com.ehealthinformatics.prognocare.feature.clinical.AdmissionDetailScreen
+import com.ehealthinformatics.prognocare.feature.clinical.VisitDetailScreen
 import com.ehealthinformatics.prognocare.feature.clinical.CreateAppointmentDialog
 import com.ehealthinformatics.prognocare.feature.clinical.CreateEncounterDialog
 import com.ehealthinformatics.prognocare.feature.clinical.CreateVisitDialog
@@ -397,6 +400,12 @@ fun PrognoCareNavGraph(
                     onOpenDocumentation = { pid ->
                         navController.navigate(FormsRoutes.picker(patientId = pid))
                     },
+                    onNewEncounter = {
+                        navController.navigate(ClinicalRoutes.ENCOUNTERS + "/new")
+                    },
+                    onNewRequest = {
+                        navController.navigate(DoctorRoutes.CREATE_REQUEST)
+                    },
                 )
             }
 
@@ -542,13 +551,17 @@ fun PrognoCareNavGraph(
             composable(NurseRoutes.DASHBOARD) {
                 NurseDashboardScreen(
                     onNavigateToVitals = { navController.navigate(NurseRoutes.VITALS) },
-                    onNavigateToRecordVitals = { navController.navigate(NurseRoutes.VITALS_RECORD) },
+                    // FAB opens the documentation form picker (patient + form),
+                    // not the static vitals form.
+                    onNavigateToRecordVitals = { navController.navigate(FormsRoutes.picker()) },
                     onNavigateToMedications = { navController.navigate(NurseRoutes.MEDICATIONS) },
                     onNavigateToCheckIn = { navController.navigate(NurseRoutes.CHECKIN) },
                     onNavigateToTasks = { navController.navigate(NurseRoutes.TASKS) },
                     onNavigateToPatients = { navController.navigate(NurseRoutes.PATIENT_LIST) },
                     onNavigateToChat = { navController.navigate(ChatRoutes.CONVERSATIONS) },
                     onNavigateToProfile = { navController.navigate(ProfileRoutes.PROFILE) },
+                    onNavigateToVisits = { navController.navigate(ClinicalRoutes.VISITS) },
+                    onNavigateToAdmissions = { navController.navigate(ClinicalRoutes.ADMISSIONS) },
                 )
             }
 
@@ -982,6 +995,40 @@ fun PrognoCareNavGraph(
                 ClinicalVisitsScreen(
                     onBack = { navController.popBackStack() },
                     onStartVisit = { navController.navigate(ClinicalRoutes.VISITS + "/create") },
+                    onVisitClick = { visitId ->
+                        navController.navigate(ClinicalRoutes.visitDetail(visitId))
+                    },
+                )
+            }
+
+            composable(
+                route = ClinicalRoutes.VISIT_DETAIL,
+                arguments = listOf(navArgument("visitId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val visitId = backStackEntry.arguments?.getString("visitId") ?: return@composable
+                VisitDetailScreen(
+                    visitId = visitId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(ClinicalRoutes.ADMISSIONS) {
+                AdmissionsListScreen(
+                    onBack = { navController.popBackStack() },
+                    onAdmissionClick = { admissionId ->
+                        navController.navigate(ClinicalRoutes.admissionDetail(admissionId))
+                    },
+                )
+            }
+
+            composable(
+                route = ClinicalRoutes.ADMISSION_DETAIL,
+                arguments = listOf(navArgument("admissionId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val admissionId = backStackEntry.arguments?.getString("admissionId") ?: return@composable
+                AdmissionDetailScreen(
+                    admissionId = admissionId,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

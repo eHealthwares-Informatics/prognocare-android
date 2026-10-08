@@ -128,7 +128,7 @@ class ChatApiContractTest {
 
         assertTrue(response.isSuccessful)
         val request = server.takeRequest()
-        assertEquals("/api/webhooks/web", request.path)
+        assertEquals("/webhooks/web", request.path)
         assertEquals("POST", request.method)
         val body = request.body.readUtf8()
         assertTrue(body.contains("PROGNOCARE_MESSAGING"))
@@ -143,7 +143,7 @@ class ChatApiContractTest {
 
         assertTrue(response.isSuccessful)
         val request = server.takeRequest()
-        assertEquals("/api/conversations/conv-1/read", request.path)
+        assertEquals("/conversations/conv-1/read", request.path)
         assertEquals("POST", request.method)
     }
 }

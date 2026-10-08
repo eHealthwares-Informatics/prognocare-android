@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,7 +46,7 @@ import com.ehealthinformatics.prognocare.designsystem.theme.Spacing
 
 /**
  * Vitals history list. Dashboard "Vitals" opens this screen; the FAB opens
- * the recording form.
+ * the recording form (New Documentation).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +72,14 @@ fun VitalsListScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.retry() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -89,7 +98,7 @@ fun VitalsListScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Record Vitals", fontWeight = FontWeight.SemiBold)
+                Text("New Documentation", fontWeight = FontWeight.SemiBold)
             }
         },
     ) { innerPadding ->
@@ -118,7 +127,7 @@ fun VitalsListScreen(
                 EmptyState(
                     icon = Icons.Default.Bloodtype,
                     title = "No vitals recorded",
-                    message = "Tap Record Vitals to capture the first reading",
+                    message = "Tap New Documentation to capture the first reading",
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),

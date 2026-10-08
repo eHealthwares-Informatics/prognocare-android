@@ -74,6 +74,8 @@ fun NurseDashboardScreen(
     onNavigateToPatients: () -> Unit,
     onNavigateToChat: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToVisits: () -> Unit = {},
+    onNavigateToAdmissions: () -> Unit = {},
     viewModel: NurseDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -92,7 +94,7 @@ fun NurseDashboardScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Record Vitals", fontWeight = FontWeight.SemiBold)
+                Text("Vitals", fontWeight = FontWeight.SemiBold)
             }
         },
     ) { innerPadding ->
@@ -236,21 +238,21 @@ fun NurseDashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         DashboardKpiCard(
-                            title = "Meds Due",
-                            value = "${state.medsToAdminister}",
+                            title = "Visits",
+                            value = "${state.visitsCount}",
                             icon = Icons.Outlined.MedicalServices,
                             iconTint = MaterialTheme.colorScheme.error,
                             iconBg = MaterialTheme.colorScheme.errorContainer,
-                            onClick = onNavigateToMedications,
+                            onClick = onNavigateToVisits,
                             modifier = Modifier.weight(1f),
                         )
                         DashboardKpiCard(
-                            title = "Completed",
-                            value = "${state.completedToday}",
+                            title = "Admissions",
+                            value = "${state.admissionsCount}",
                             icon = Icons.Default.CheckCircle,
                             iconTint = AppThemeColors.current.kpiGreen,
                             iconBg = AppThemeColors.current.kpiGreenLight,
-                            onClick = { /* completed */ },
+                            onClick = onNavigateToAdmissions,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -300,7 +302,7 @@ fun NurseDashboardScreen(
                     ) {
                         DashboardQuickAction(
                             icon = Icons.Outlined.Bloodtype,
-                            label = "Record Vitals",
+                            label = "Vitals",
                             iconTint = AppThemeColors.current.kpiBlue,
                             iconBg = AppThemeColors.current.kpiBlueLight,
                             onClick = onNavigateToVitals,
@@ -324,7 +326,7 @@ fun NurseDashboardScreen(
                         )
                         DashboardQuickAction(
                             icon = Icons.Default.TaskAlt,
-                            label = "View Tasks",
+                            label = "Tasks",
                             iconTint = AppThemeColors.current.kpiPurple,
                             iconBg = AppThemeColors.current.kpiPurpleLight,
                             onClick = onNavigateToTasks,

@@ -1,6 +1,7 @@
 package com.ehealthinformatics.prognocare.data.remote
 
 import com.ehealthinformatics.prognocare.data.config.AppConfigStore
+import com.ehealthinformatics.prognocare.data.remote.api.AdmissionApi
 import com.ehealthinformatics.prognocare.data.remote.api.AppointmentApi
 import com.ehealthinformatics.prognocare.data.remote.api.DashboardApi
 import com.ehealthinformatics.prognocare.data.remote.api.EncounterApi
@@ -52,6 +53,7 @@ data class ApiBundle(
     val referralApi: ReferralApi,
     val medicationApi: MedicationApi,
     val notificationApi: NotificationApi,
+    val admissionApi: AdmissionApi,
 )
 
 @Singleton
@@ -83,7 +85,7 @@ class RetrofitClient @Inject constructor(
         .build()
 
     private fun buildRetrofit(baseUrl: String): Retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
+        .baseUrl(baseUrl.trimEnd('/') + "/")
         .client(buildHttpClient())
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
@@ -106,6 +108,7 @@ class RetrofitClient @Inject constructor(
             referralApi = retrofit.create(ReferralApi::class.java),
             medicationApi = retrofit.create(MedicationApi::class.java),
             notificationApi = retrofit.create(NotificationApi::class.java),
+            admissionApi = retrofit.create(AdmissionApi::class.java),
         )
     }
 

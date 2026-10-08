@@ -83,7 +83,7 @@ fun VitalsRecordingScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Record Vitals",
+                        text = "New Documentation",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )

@@ -167,7 +167,7 @@ class NotificationApiContractTest {
 
         val request = server.takeRequest()
         assertEquals("POST", request.method)
-        assertTrue(request.path.orEmpty().contains("/api/notification-subscriptions"))
+        assertTrue(request.path.orEmpty().contains("/notification-subscriptions"))
         // Contract: body optional; tenant comes from JWT — never send org/location.
         val body = request.body.readUtf8()
         assertTrue(body.isBlank() || body == "{}" || !body.contains("organizationId"))

@@ -79,7 +79,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Saves the relative query range period (dates resolved at query time). */
-    fun saveQueryRange(period: QueryRangePeriod?) {
+    fun saveQueryRange(period: QueryRangePeriod) {
         viewModelScope.launch {
             _dateRangeSaving.value = true
             _dateRangeMessage.value = null
@@ -87,7 +87,7 @@ class SettingsViewModel @Inject constructor(
                 val current = configStore.config.value
                 configStore.updateConfig(current.withQueryRange(period))
                 _dateRangeMessage.value = when (period) {
-                    null -> "Query range cleared — using today."
+                    QueryRangePeriod.NONE -> "Query range cleared — no filter (dashboards use today)."
                     else -> "Query range saved — queries use “${period.label}”."
                 }
             } catch (e: Exception) {
