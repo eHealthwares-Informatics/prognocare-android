@@ -154,8 +154,13 @@ object ProfileRoutes {
 object ClinicalRoutes {
     const val APPOINTMENTS = "clinical/appointments"
     const val VISITS = "clinical/visits"
+    const val VISIT_DETAIL = "clinical/visits/{visitId}"
     const val ENCOUNTERS = "clinical/encounters"
     const val ADMISSIONS = "clinical/admissions"
+    const val ADMISSION_DETAIL = "clinical/admissions/{admissionId}"
+
+    fun visitDetail(visitId: String) = "clinical/visits/$visitId"
+    fun admissionDetail(admissionId: String) = "clinical/admissions/$admissionId"
 }
 
 // ── Forms (dynamic documentation, shared) ──────────────────────

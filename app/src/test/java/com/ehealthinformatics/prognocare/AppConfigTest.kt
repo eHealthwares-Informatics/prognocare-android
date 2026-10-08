@@ -101,9 +101,9 @@ class AppConfigTest {
     }
 
     @Test
-    fun `conversation url normalization keeps path`() {
+    fun `conversation url normalization keeps path with trailing slash`() {
         assertEquals(
-            "http://192.168.1.20:8090/api",
+            "http://192.168.1.20:8090/api/",
             config.withConversationBaseUrl("http://192.168.1.20:8090/api/").conversationBaseUrl,
         )
     }

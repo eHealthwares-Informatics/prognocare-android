@@ -72,7 +72,7 @@ class FormApiContractTest {
         assertTrue(body.data[0].isPublished)
 
         val request = server.takeRequest()
-        assertEquals("/api/forms/available", request.path)
+        assertEquals("/forms/available", request.path)
     }
 
     @Test
@@ -112,7 +112,7 @@ class FormApiContractTest {
         assertEquals("SUBMITTED", body.status)
 
         val request = server.takeRequest()
-        assertEquals("/api/form-submissions", request.path)
+        assertEquals("/form-submissions", request.path)
         assertEquals("POST", request.method)
         val sent = request.body.readUtf8()
         assertTrue(sent.contains("\"formDefinitionId\":\"f1\""))

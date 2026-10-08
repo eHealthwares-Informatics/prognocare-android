@@ -99,7 +99,7 @@ class AppointmentApiContractTest {
         val request = server.takeRequest()
         assertEquals("GET", request.method)
         val path = request.path!!
-        assertTrue(path.startsWith("/api/appointments?"))
+        assertTrue(path.startsWith("/appointments?"))
         assertTrue(path.contains("date=2026-09-22"))
         assertTrue(path.contains("status=SCHEDULED"))
         assertTrue(path.contains("patientId=MRN-100"))
@@ -134,7 +134,7 @@ class AppointmentApiContractTest {
         assertEquals("APT-2", response.body()!!.appointmentNumber)
 
         val request = server.takeRequest()
-        assertEquals("/api/appointments", request.path)
+        assertEquals("/appointments", request.path)
         val bodyText = request.body.readUtf8()
         assertTrue(bodyText.contains("\"patientId\":\"MRN-100\""))
         assertTrue(bodyText.contains("\"appointmentType\":\"CHECKUP\""))
@@ -161,7 +161,7 @@ class AppointmentApiContractTest {
         assertEquals("visit-9", body.visit?.id)
 
         val request = server.takeRequest()
-        assertEquals("/api/appointments/apt-1/check-in", request.path)
+        assertEquals("/appointments/apt-1/check-in", request.path)
         assertEquals("POST", request.method)
     }
 
@@ -179,7 +179,7 @@ class AppointmentApiContractTest {
         assertEquals("CANCELLED", response.body()!!.status)
 
         val request = server.takeRequest()
-        assertEquals("/api/appointments/apt-1/cancel", request.path)
+        assertEquals("/appointments/apt-1/cancel", request.path)
         assertTrue(request.body.readUtf8().contains("Patient unavailable"))
     }
 
@@ -193,8 +193,8 @@ class AppointmentApiContractTest {
 
         assertEquals("NO_SHOW", noShow.status)
         assertEquals("COMPLETED", complete.status)
-        assertEquals("/api/appointments/apt-1/no-show", server.takeRequest().path)
-        assertEquals("/api/appointments/apt-1/complete", server.takeRequest().path)
+        assertEquals("/appointments/apt-1/no-show", server.takeRequest().path)
+        assertEquals("/appointments/apt-1/complete", server.takeRequest().path)
     }
 
     @Test

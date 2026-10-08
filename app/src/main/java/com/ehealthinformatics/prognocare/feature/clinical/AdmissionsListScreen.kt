@@ -1,5 +1,6 @@
 package com.ehealthinformatics.prognocare.feature.clinical
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,6 +57,7 @@ private fun admissionStatusType(status: String): StatusType = when (status.upper
 @Composable
 fun AdmissionsListScreen(
     onBack: () -> Unit,
+    onAdmissionClick: (String) -> Unit = {},
     viewModel: AdmissionsListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -121,7 +123,10 @@ fun AdmissionsListScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     items(state.admissions, key = { it.id }) { admission ->
-                        AdmissionCard(admission = admission)
+                        AdmissionCard(
+                            admission = admission,
+                            onClick = { onAdmissionClick(admission.id) },
+                        )
                     }
                 }
             }
@@ -130,9 +135,11 @@ fun AdmissionsListScreen(
 }
 
 @Composable
-private fun AdmissionCard(admission: Admission) {
+private fun AdmissionCard(admission: Admission, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(Spacing.base),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
