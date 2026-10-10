@@ -10,10 +10,16 @@ enum class QueryRangePeriod(val id: String, val label: String) {
     NONE("none", "None (default)"),
     /** Calendar today. */
     TODAY("today", "Today"),
+    /** Last 1 day ending today. */
+    LAST_DAY("last_day", "Last day"),
     /** Monday → today (7 days ending today). */
     THIS_WEEK("this_week", "This week"),
+    /** Last 7 days ending today. */
+    LAST_WEEK("last_week", "Last week"),
     /** First of month → today (up to 31 days ending today). */
     THIS_MONTH("this_month", "This month"),
+    /** Last 30 days ending today. */
+    LAST_MONTH("last_month", "Last month"),
     ;
 
     companion object {
@@ -91,14 +97,26 @@ fun QueryRangePeriod.resolve(today: LocalDate = LocalDate.now()): QueryDateRange
         QueryRangePeriod.NONE -> null
         QueryRangePeriod.TODAY ->
             QueryDateRange(start = today.toString(), end = today.toString())
+        QueryRangePeriod.LAST_DAY ->
+            QueryDateRange(start = today.toString(), end = today.toString())
         QueryRangePeriod.THIS_WEEK -> {
             val start = today.with(java.time.DayOfWeek.MONDAY)
             QueryDateRange(start = start.toString(), end = today.toString())
         }
+        QueryRangePeriod.LAST_WEEK ->
+            QueryDateRange(
+                start = today.minus(6, ChronoUnit.DAYS).toString(),
+                end = today.toString(),
+            )
         QueryRangePeriod.THIS_MONTH -> {
             val start = today.withDayOfMonth(1)
             QueryDateRange(start = start.toString(), end = today.toString())
         }
+        QueryRangePeriod.LAST_MONTH ->
+            QueryDateRange(
+                start = today.minus(29, ChronoUnit.DAYS).toString(),
+                end = today.toString(),
+            )
     }
 
 /**
