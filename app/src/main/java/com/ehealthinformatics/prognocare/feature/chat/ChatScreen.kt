@@ -262,7 +262,9 @@ private fun ChatBubble(
     onOptionSelect: (String) -> Unit,
 ) {
     val isMe = message.direction == "inbound"
-    val parsed = if (!isMe) ChatOptionParser.parse(message.text) else null
+    // Envelope-first (Phase 6.1): structured payload wins; falls back to the
+    // flattened-text parser mapped onto the same envelope.
+    val envelope = if (!isMe) ChatQuestionEnvelope.from(message) else null
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -272,8 +274,11 @@ private fun ChatBubble(
             modifier = Modifier.width(320.dp),
             horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
         ) {
-            if (parsed != null) {
-                OptionCard(parsed = parsed, onOptionSelect = onOptionSelect)
+            if (envelope != null) {
+                OptionCard(
+                    envelope = envelope,
+                    onOptionSelect = onOptionSelect,
+                )
             } else {
                 Box(
                     modifier = Modifier
@@ -311,9 +316,15 @@ private fun ChatBubble(
 
 @Composable
 private fun OptionCard(
-    parsed: ParsedQuestionOptions,
+    envelope: ChatQuestionEnvelope,
     onOptionSelect: (String) -> Unit,
 ) {
+    // MULTI questions accumulate selections client-side and batch-send on
+    // Done/NONE; the server remains authoritative over final validation.
+    var selected by remember(envelope.questionId, envelope.title) {
+        mutableStateOf(setOf<String>())
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -325,18 +336,67 @@ private fun OptionCard(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
-            text = parsed.title,
+            text = envelope.title,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        parsed.options.forEach { option ->
+        val progress = listOfNotNull(
+            envelope.progressIndex?.let { "Step ${it + 1}" },
+            envelope.progressTotal?.let { "of $it" },
+        ).joinToString(" ")
+        if (progress.isNotEmpty()) {
+            Text(
+                text = progress,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        envelope.options.forEach { option ->
+            val isSelected = option.key in selected
             ElevatedButton(
-                onClick = { onOptionSelect(option.value) },
+                onClick = {
+                    if (!envelope.isMultiSelect) {
+                        onOptionSelect(option.key)
+                    } else {
+                        selected =
+                            if (isSelected) selected - option.key
+                            else selected + option.key
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Spacing.md),
             ) {
-                Text(option.label)
+                Text(
+                    text = if (isSelected && envelope.isMultiSelect)
+                        "✓ ${option.label}" else option.label,
+                )
+            }
+        }
+        if (envelope.isMultiSelect) {
+            if (selected.isNotEmpty()) {
+                ElevatedButton(
+                    onClick = {
+                        // Batch answer: comma-joined keys per the engine ANSWER
+                        // contract for multi-iterative questions.
+                        onOptionSelect(selected.joinToString(","))
+                        selected = emptySet()
+                    },
+                    enabled = selected.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Spacing.md),
+                ) {
+                    Text("Done (${selected.size} selected)")
+                }
+            }
+            if (envelope.allowNone) {
+                ElevatedButton(
+                    onClick = { onOptionSelect(ChatQuestionEnvelope.NONE_SENTINEL) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Spacing.md),
+                ) {
+                    Text("None of these")
+                }
             }
         }
     }

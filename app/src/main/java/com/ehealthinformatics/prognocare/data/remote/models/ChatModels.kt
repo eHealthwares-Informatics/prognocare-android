@@ -96,6 +96,12 @@ data class ExchangeMessage(
     val createdAt: String = "",
     val status: String? = null,
     val optimistic: Boolean = false,
+    /**
+     * Structured channel payload carried by the engine (Exchange.payload).
+     * QUESTION-bearing messages de-serialize it into [ChatQuestionEnvelope]
+     * at render time; unknown shapes are ignored gracefully.
+     */
+    val payload: kotlinx.serialization.json.JsonElement? = null,
 )
 
 @Serializable

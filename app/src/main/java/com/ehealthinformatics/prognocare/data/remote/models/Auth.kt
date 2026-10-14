@@ -8,6 +8,18 @@ data class LoginDto(
     val password: String,
 )
 
+/** Google Credential Manager ID token (JWT) verified server-side. */
+@Serializable
+data class GoogleAuthRequest(
+    val idToken: String,
+)
+
+/** Facebook Login access token verified server-side via Graph. */
+@Serializable
+data class FacebookAuthRequest(
+    val accessToken: String,
+)
+
 @Serializable
 data class AuthResponse(
     val accessToken: String = "",

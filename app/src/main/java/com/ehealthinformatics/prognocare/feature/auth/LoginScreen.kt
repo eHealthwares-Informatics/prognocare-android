@@ -51,7 +51,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import android.app.Activity
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
+import com.ehealthinformatics.prognocare.BuildConfig
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.facebook.login.LoginManager
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ehealthinformatics.prognocare.R
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
@@ -472,18 +486,111 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(Spacing.lg))
 
             // ── Social login buttons ─────────────────────────
+            val socialContext = LocalContext.current
+            val socialScope = rememberCoroutineScope()
+            val credentialManager = remember { CredentialManager.create(socialContext) }
+            var socialBusy by remember { mutableStateOf(false) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 SocialLoginButton(
                     text = "Google",
-                    onClick = { /* TODO: Google login */ },
+                    enabled = !socialBusy,
+                    onClick = {
+                        if (socialBusy) return@SocialLoginButton
+                        socialBusy = true
+                        socialScope.launch {
+                            try {
+                                val googleIdOption = GetGoogleIdOption.Builder()
+                                    // Audience of the returned ID token — the
+                                    // backend verifies `aud` against this value.
+                                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .build()
+                                val request = GetCredentialRequest.Builder()
+                                    .addCredentialOption(googleIdOption)
+                                    .build()
+                                val result = runCatching {
+                                    credentialManager.getCredential(socialContext, request)
+                                }.getOrElse { e ->
+                                    // Derive flow can report no candidate even
+                                    // when accounts exist; fall back to the
+                                    // explicit button flow (own account chooser).
+                                    if (e is NoCredentialException) {
+                                        val explicit = GetCredentialRequest.Builder()
+                                            .addCredentialOption(
+                                                GetSignInWithGoogleOption.Builder(
+                                                    BuildConfig.GOOGLE_WEB_CLIENT_ID,
+                                                ).build(),
+                                            )
+                                            .build()
+                                        credentialManager.getCredential(socialContext, explicit)
+                                    } else {
+                                        throw e
+                                    }
+                                }
+                                val credential = result.credential
+                                if (credential is GoogleIdTokenCredential) {
+                                    loginViewModel.loginWithGoogle(credential.idToken)
+                                } else {
+                                    loginError = "Unexpected Google credential type"
+                                }
+                            } catch (_: GetCredentialCancellationException) {
+                                // User closed the account sheet — not an error.
+                            } catch (_: NoCredentialException) {
+                                loginError =
+                                    "No Google account available. Sign in to a Google " +
+                                        "account on this phone and try again."
+                            } catch (e: GetCredentialException) {
+                                loginError =
+                                    "Google sign-in unavailable — check Play Services (${e.type})"
+                            } finally {
+                                socialBusy = false
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
                 SocialLoginButton(
                     text = "Apple",
-                    onClick = { /* TODO: Apple login */ },
+                    onClick = { /* TODO: Apple login (out of scope) */ },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                SocialLoginButton(
+                    text = "Facebook",
+                    enabled = !socialBusy,
+                    onClick = {
+                        if (socialBusy) return@SocialLoginButton
+                        if (BuildConfig.FACEBOOK_APP_ID.isBlank()) {
+                            loginError = "Facebook sign-in not configured in this build"
+                            return@SocialLoginButton
+                        }
+                        val activity = socialContext as? Activity
+                        if (activity == null) {
+                            loginError = "Facebook sign-in unavailable"
+                            return@SocialLoginButton
+                        }
+                        socialBusy = true
+                        FacebookAuthBridge.onFacebookResult = { token, cancelled, error ->
+                            when {
+                                cancelled -> Unit
+                                error != null -> loginError = error
+                                token != null -> loginViewModel.loginWithFacebook(token)
+                            }
+                            socialBusy = false
+                        }
+                        LoginManager.getInstance()
+                            .logInWithReadPermissions(
+                                activity,
+                                listOf("public_profile", "email"),
+                            )
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -571,11 +678,12 @@ private fun SocialLoginButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Card(
         modifier = modifier
             .height(48.dp)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(Spacing.md),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -587,7 +695,8 @@ private fun SocialLoginButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    .copy(alpha = if (enabled) 1f else 0.5f),
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
             )
