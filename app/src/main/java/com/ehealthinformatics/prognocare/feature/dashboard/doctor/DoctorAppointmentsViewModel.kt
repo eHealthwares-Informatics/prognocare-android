@@ -116,7 +116,13 @@ class DoctorAppointmentsViewModel @Inject constructor(
         _state.value = snapshot.copy(isLoading = true, error = null)
         try {
             val query = AppointmentQuery(
-                date = if (snapshot.filter == AppointmentFilters.TODAY) repository.today() else null,
+                // "Today" chip uses the settings query date-range when set,
+                // otherwise the calendar today.
+                date = if (snapshot.filter == AppointmentFilters.TODAY) {
+                    repository.resolveDateParam(null, defaultToday = true)
+                } else {
+                    null
+                },
                 status = when (snapshot.filter) {
                     AppointmentFilters.SCHEDULED -> "SCHEDULED"
                     AppointmentFilters.IN_PROGRESS -> "IN_PROGRESS"

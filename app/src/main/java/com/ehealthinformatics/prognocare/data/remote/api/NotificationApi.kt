@@ -21,22 +21,22 @@ import retrofit2.http.Query
  */
 interface NotificationApi {
 
-    @GET("api/notifications")
+    @GET("notifications")
     suspend fun list(
         @Query("since") since: String? = null,
         @Query("limit") limit: Int = 50,
     ): Response<PaginatedResponse<NotificationItem>>
 
-    @GET("api/notifications/unread-count")
+    @GET("notifications/unread-count")
     suspend fun unreadCount(): Response<UnreadCountResponse>
 
-    @PUT("api/notifications/{id}/read")
+    @PUT("notifications/{id}/read")
     suspend fun markRead(@Path("id") id: String): Response<MarkNotificationReadResponse>
 
-    @PATCH("api/notifications/read-all")
+    @PATCH("notifications/read-all")
     suspend fun markAllRead(): Response<MarkAllNotificationsReadResponse>
 
-    @POST("api/notification-subscriptions")
+    @POST("notification-subscriptions")
     suspend fun subscribe(
         @Body dto: SubscribeNotificationsDto,
     ): Response<NotificationSubscription>

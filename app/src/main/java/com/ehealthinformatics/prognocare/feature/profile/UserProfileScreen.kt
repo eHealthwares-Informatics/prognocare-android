@@ -186,91 +186,105 @@ fun UserProfileScreen(
             )
         },
     ) { innerPadding ->
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else {
-            val profile = state.profile ?: return@Scaffold
+        // Render immediately from the local seed; network refresh updates in place.
+        val profile = state.profile
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(Spacing.base),
-            ) {
-                // ── Profile Header ─────────────────────────────
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.base),
+        ) {
+            if (profile == null) {
                 item {
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                            .padding(Spacing.xl),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        // Avatar
-                        Box(
-                            modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = profile.name.take(1),
-                                style = MaterialTheme.typography.displaySmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                return@LazyColumn
+            }
 
-                        Spacer(modifier = Modifier.height(Spacing.md))
-
-                        // Name
+            // ── Profile Header ─────────────────────────────
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Text(
-                            text = profile.name,
-                            style = MaterialTheme.typography.headlineSmall,
+                            text = profile.name.take(1),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                    }
 
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // Name
+                    Text(
+                        text = profile.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+
+                    if (state.isRefreshing) {
                         Spacer(modifier = Modifier.height(Spacing.xs))
-
-                        // Role badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(AppThemeColors.current.kpiBlueLight)
-                                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                        ) {
-                            Text(
-                                text = profile.role.displayName,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = AppThemeColors.current.kpiBlue,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-
-                        // Department & Facility
                         Text(
-                            text = profile.department,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = profile.facility,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "Updating profile…",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+
+                    // Role badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(AppThemeColors.current.kpiBlueLight)
+                            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                    ) {
+                        Text(
+                            text = profile.role.displayName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AppThemeColors.current.kpiBlue,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+
+                    // Department & Facility
+                    Text(
+                        text = profile.department,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = profile.facility,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+            }
 
                 // ── Role Switch ────────────────────────────────
                 item {
@@ -803,8 +817,8 @@ fun UserProfileScreen(
                             Spacer(modifier = Modifier.height(Spacing.md))
                             ServerConfigContent(
                                 config = appConfig,
-                                onSave = { emr, conv, channel ->
-                                    viewModel.saveServerConfig(emr, conv, channel)
+                                onSave = { emr, conv, channel, env ->
+                                    viewModel.saveServerConfig(emr, conv, channel, env)
                                 },
                                 onReset = { viewModel.resetServerConfig() },
                             )
@@ -816,7 +830,6 @@ fun UserProfileScreen(
             }
         }
     }
-}
 
 @Composable
 private fun ProfileInfoRow(

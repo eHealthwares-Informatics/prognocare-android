@@ -11,6 +11,7 @@ import com.ehealthinformatics.prognocare.data.remote.models.DecideReferralDto
 import com.ehealthinformatics.prognocare.data.remote.models.CreateRequestDto
 import com.ehealthinformatics.prognocare.data.remote.models.DashboardSummary
 import com.ehealthinformatics.prognocare.data.remote.models.Encounter
+import com.ehealthinformatics.prognocare.data.remote.models.FormSubmission
 import com.ehealthinformatics.prognocare.data.remote.models.Location
 import com.ehealthinformatics.prognocare.data.remote.models.Medication
 import com.ehealthinformatics.prognocare.data.remote.models.PaginatedResponse
@@ -117,6 +118,23 @@ class EmrRepository @Inject constructor(
         val response = retrofitClient.apis.first().encounterApi.list(
             patientId = patientId,
             visitId = visitId,
+            limit = limit,
+        )
+        if (!response.isSuccessful) throw failure(response)
+        return response.body()?.data.orEmpty()
+    }
+
+    /** Form submissions (documentation), optionally scoped by patient MRN. */
+    suspend fun formSubmissions(
+        patientId: String? = null,
+        visitId: String? = null,
+        encounterId: String? = null,
+        limit: Int = 50,
+    ): List<FormSubmission> {
+        val response = retrofitClient.apis.first().formApi.listSubmissions(
+            patientId = patientId,
+            visitId = visitId,
+            encounterId = encounterId,
             limit = limit,
         )
         if (!response.isSuccessful) throw failure(response)

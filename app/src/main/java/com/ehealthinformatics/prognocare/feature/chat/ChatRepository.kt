@@ -143,6 +143,14 @@ class ChatRepository @Inject constructor(
                 // still minting the real conversation for this first reply;
                 // keep it under its own bucket so the screen can follow it.
                 val bucket = convId.ifEmpty { "pending" }
+                // Structured QUESTION envelopes (Phase 6.1): the engine may
+                // attach Exchange.payload with the question structure; carry
+                // it through verbatim so the envelope parser can decide.
+                val payload = raw.opt("payload")?.let {
+                    if (it is org.json.JSONObject) runCatching {
+                        kotlinx.serialization.json.Json.parseToJsonElement(it.toString())
+                    }.getOrNull() else null
+                }
                 val message = ExchangeMessage(
                     id = raw.optString("id"),
                     conversationId = convId,
@@ -152,6 +160,7 @@ class ChatRepository @Inject constructor(
                     text = text,
                     createdAt = raw.optString("createdAt"),
                     status = raw.optString("status").ifEmpty { null },
+                    payload = payload,
                 )
                 val existing = _messagesByConversation.value[bucket].orEmpty()
                 val hasSame = existing.any {

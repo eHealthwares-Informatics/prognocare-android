@@ -17,7 +17,7 @@ import retrofit2.http.Query
 
 interface EncounterApi {
 
-    @GET("api/encounters")
+    @GET("encounters")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -25,22 +25,22 @@ interface EncounterApi {
         @Query("visitId") visitId: String? = null,
     ): Response<PaginatedResponse<Encounter>>
 
-    @POST("api/encounters")
+    @POST("encounters")
     suspend fun create(@Body dto: CreateEncounterDto): Response<Encounter>
 
-    @GET("api/encounters/{id}")
+    @GET("encounters/{id}")
     suspend fun getById(@Path("id") id: String): Response<Encounter>
 
-    @PATCH("api/encounters/{id}")
+    @PATCH("encounters/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdateEncounterDto,
     ): Response<Encounter>
 
-    @DELETE("api/encounters/{id}")
+    @DELETE("encounters/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 
-    @POST("api/encounters/{id}/requests")
+    @POST("encounters/{id}/requests")
     suspend fun createRequest(
         @Path("id") id: String,
         @Body dto: CreateEncounterRequestDto,

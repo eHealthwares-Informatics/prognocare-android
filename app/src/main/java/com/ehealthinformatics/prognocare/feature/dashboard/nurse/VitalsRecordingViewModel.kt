@@ -64,13 +64,18 @@ class VitalsRecordingViewModel @Inject constructor(
      * Submits vitals as a VITALS form submission. [raw] is keyed by clinical
      * concept (e.g. "bpSystolic", "oxygenSaturation"); the schema mapper
      * translates them into whatever keys this facility's VITALS form uses.
-     * Returns the server's real error text on failure so the message is
-     * actionable instead of a generic "check the form keys".
+     *
+     * [patientMrn] must be the patient **MRN** (`Patient.patientId`) — the
+     * same identifier encounters/visits store — not the patient row UUID.
+     * Optional [visitId]/[encounterId] link the submission so encounter
+     * screens can load it.
      */
     suspend fun submitVitals(
         form: FormDefinition,
-        patientId: String,
+        patientMrn: String,
         raw: Map<String, Any?>,
+        visitId: String? = null,
+        encounterId: String? = null,
     ): VitalsSaveResult {
         return runCatching {
             val payload = SchemaKeyMapper.map(form.schemaJson, raw)
@@ -82,7 +87,9 @@ class VitalsRecordingViewModel @Inject constructor(
             val response = retrofitClient.apis.value.formApi.createSubmission(
                 com.ehealthinformatics.prognocare.data.remote.models.CreateFormSubmissionDto(
                     formDefinitionId = form.id,
-                    patientId = patientId,
+                    patientId = patientMrn,
+                    visitId = visitId,
+                    encounterId = encounterId,
                     dataJson = payload,
                     status = "SUBMITTED",
                 ),
@@ -97,6 +104,29 @@ class VitalsRecordingViewModel @Inject constructor(
         }.getOrElse {
             VitalsSaveResult.Failure(it.message ?: "unexpected error")
         }
+    }
+
+    /**
+     * Resolves the patient's ongoing visit and active encounter (best-effort)
+     * so vitals submitted from the nurse flow show up on the clinical screen.
+     * Returns [VisitLink] with nulls when nothing is open.
+     */
+    data class VisitLink(val visitId: String?, val encounterId: String?)
+
+    suspend fun resolveVisitLink(patientMrn: String): VisitLink {
+        return runCatching {
+            val apis = retrofitClient.apis.value
+            val visit = apis.visitApi.list(status = "ONGOING", patientId = patientMrn, limit = 1)
+                .body()?.data?.firstOrNull()
+            val encounter = visit?.id?.let { visitId ->
+                apis.encounterApi.list(visitId = visitId, limit = 20)
+                    .body()?.data?.firstOrNull { it.isActive }
+            } ?: apis.encounterApi.list(limit = 50)
+                .body()?.data?.firstOrNull {
+                    it.isActive && it.patientId == patientMrn
+                }
+            VisitLink(visitId = visit?.id, encounterId = encounter?.id)
+        }.getOrDefault(VisitLink(null, null))
     }
 
     fun load() {

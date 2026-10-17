@@ -21,39 +21,39 @@ interface FormApi {
 
     // ── Form Definitions ──────────────────────────────────────
 
-    @GET("api/form-definitions")
+    @GET("form-definitions")
     suspend fun listDefinitions(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
     ): Response<PaginatedResponse<FormDefinition>>
 
-    @POST("api/form-definitions")
+    @POST("form-definitions")
     suspend fun createDefinition(@Body dto: CreateFormDefinitionDto): Response<FormDefinition>
 
-    @GET("api/form-definitions/{id}")
+    @GET("form-definitions/{id}")
     suspend fun getDefinitionById(@Path("id") id: String): Response<FormDefinition>
 
-    @PATCH("api/form-definitions/{id}")
+    @PATCH("form-definitions/{id}")
     suspend fun updateDefinition(
         @Path("id") id: String,
         @Body dto: UpdateFormDefinitionDto,
     ): Response<FormDefinition>
 
-    @DELETE("api/form-definitions/{id}")
+    @DELETE("form-definitions/{id}")
     suspend fun deleteDefinition(@Path("id") id: String): Response<Unit>
 
-    @POST("api/form-definitions/{id}/publish")
+    @POST("form-definitions/{id}/publish")
     suspend fun publish(
         @Path("id") id: String,
         @Body dto: PublishFormDto = PublishFormDto(),
     ): Response<FormDefinition>
 
-    @POST("api/form-definitions/{id}/unpublish")
+    @POST("form-definitions/{id}/unpublish")
     suspend fun unpublish(@Path("id") id: String): Response<FormDefinition>
 
     // ── Form Submissions ──────────────────────────────────────
 
-    @GET("api/form-submissions")
+    @GET("form-submissions")
     suspend fun listSubmissions(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -63,28 +63,28 @@ interface FormApi {
         @Query("formDefinitionId") formDefinitionId: String? = null,
     ): Response<PaginatedResponse<FormSubmission>>
 
-    @POST("api/form-submissions")
+    @POST("form-submissions")
     suspend fun createSubmission(@Body dto: CreateFormSubmissionDto): Response<FormSubmission>
 
-    @GET("api/form-submissions/{id}")
+    @GET("form-submissions/{id}")
     suspend fun getSubmissionById(@Path("id") id: String): Response<FormSubmission>
 
-    @PATCH("api/form-submissions/{id}")
+    @PATCH("form-submissions/{id}")
     suspend fun updateSubmission(
         @Path("id") id: String,
         @Body dto: UpdateFormSubmissionDto,
     ): Response<FormSubmission>
 
-    @DELETE("api/form-submissions/{id}")
+    @DELETE("form-submissions/{id}")
     suspend fun deleteSubmission(@Path("id") id: String): Response<Unit>
 
-    @GET("api/form-submissions/{id}/chain")
+    @GET("form-submissions/{id}/chain")
     suspend fun getAmendChain(@Path("id") id: String): Response<List<FormSubmission>>
 
-    @GET("api/form-submissions/{id}/pdf")
+    @GET("form-submissions/{id}/pdf")
     suspend fun getPdf(@Path("id") id: String): Response<okhttp3.ResponseBody>
 
-    @POST("api/form-submissions/{id}/amend")
+    @POST("form-submissions/{id}/amend")
     suspend fun amend(
         @Path("id") id: String,
         @Body dto: UpdateFormSubmissionDto,
@@ -92,6 +92,6 @@ interface FormApi {
 
     // ── Available Forms ───────────────────────────────────────
 
-    @GET("api/forms/available")
+    @GET("forms/available")
     suspend fun availableForms(): Response<PaginatedResponse<FormDefinition>>
 }

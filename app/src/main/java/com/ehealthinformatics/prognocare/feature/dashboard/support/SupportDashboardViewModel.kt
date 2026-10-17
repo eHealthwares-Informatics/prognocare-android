@@ -46,7 +46,9 @@ class SupportDashboardViewModel @Inject constructor(
                 _state.update { it.copy(isLoading = true) }
                 _error.value = null
                 val today = java.time.LocalDate.now().toString()
-                val appointments = appointmentsRepository.list(AppointmentQuery(date = today, limit = 100))
+                val appointments = appointmentsRepository.list(
+                    AppointmentQuery(limit = 100, defaultToday = true),
+                )
 
                 val queue = appointments.map { apt ->
                     SupportCheckIn(

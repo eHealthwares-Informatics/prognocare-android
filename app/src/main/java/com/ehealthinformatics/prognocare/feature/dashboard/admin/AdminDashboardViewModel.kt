@@ -42,7 +42,9 @@ class AdminDashboardViewModel @Inject constructor(
             try {
                 _state.value = _state.value.copy(isLoading = true, error = null)
                 val today = java.time.LocalDate.now().toString()
-                val appointments = appointmentsRepository.list(AppointmentQuery(date = today, limit = 100))
+                val appointments = appointmentsRepository.list(
+                    AppointmentQuery(limit = 100, defaultToday = true),
+                )
                 val summary = runCatching { emrRepository.dashboard(today) }.getOrNull()
                 val staff = runCatching { emrRepository.staff(limit = 100) }.getOrDefault(emptyList())
 

@@ -21,6 +21,13 @@ sealed class ConnectionCheck {
 /**
  * Validates a candidate config against live endpoints. Used by the settings
  * flow to confirm EMR + Conversation Engine URLs before persisting them.
+ *
+ * Health paths (after stripping a trailing slash from the base URL):
+ * - LAN/dev: `{base}/api/health` (Nest global prefix)
+ * - Production gateway: `{base}/health` where base is
+ *   `https://api.ehealthwares.com/emr` or `.../conversation`
+ *   (gateway strips the service prefix; Nest still serves `/api/health`
+ *   internally, exposed externally as `/health`).
  */
 @Singleton
 class ServerConfigVerifier @Inject constructor() {
@@ -46,10 +53,13 @@ class ServerConfigVerifier @Inject constructor() {
     private suspend fun checkEmr(baseUrl: String): ConnectionCheck {
         return try {
             val health = retrofit(baseUrl).create(HealthApi::class.java).health()
-            if (health.isSuccessful && health.body()?.status == "ok") {
+            if (isHealthy(health)) {
                 ConnectionCheck.Success("EMR")
             } else {
-                ConnectionCheck.Failure("EMR", "unexpected response")
+                ConnectionCheck.Failure(
+                    "EMR",
+                    "unexpected response (${health.code()})",
+                )
             }
         } catch (e: Exception) {
             ConnectionCheck.Failure("EMR", e.message ?: "unreachable")
@@ -59,13 +69,28 @@ class ServerConfigVerifier @Inject constructor() {
     private suspend fun checkConversation(baseUrl: String): ConnectionCheck {
         return try {
             val health = retrofit(baseUrl).create(ConversationHealthApi::class.java).health()
-            if (health.isSuccessful && health.body()?.status == "ok") {
+            if (isHealthy(health)) {
                 ConnectionCheck.Success("Conversation engine")
             } else {
-                ConnectionCheck.Failure("Conversation engine", "unexpected response")
+                ConnectionCheck.Failure(
+                    "Conversation engine",
+                    "unexpected response (${health.code()})",
+                )
             }
         } catch (e: Exception) {
             ConnectionCheck.Failure("Conversation engine", e.message ?: "unreachable")
         }
+    }
+
+    /**
+     * Accept any 2xx JSON body that carries a `status` field — production
+     * gateways may return `{status:"ok", service:"..."}` while LAN Nest
+     * returns the same shape; HTML SPA fallbacks fail parsing.
+     */
+    private fun isHealthy(response: retrofit2.Response<HealthStatus>): Boolean {
+        if (!response.isSuccessful) return false
+        val body = response.body() ?: return false
+        return body.status.equals("ok", ignoreCase = true) ||
+            body.status.equals("healthy", ignoreCase = true)
     }
 }

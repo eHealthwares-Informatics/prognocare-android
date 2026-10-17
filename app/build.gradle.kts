@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,7 +8,6 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
 }
-
 android {
     namespace = "com.ehealthinformatics.prognocare"
     compileSdk = 35
@@ -23,17 +24,45 @@ android {
         buildConfigField(
             "String",
             "DEFAULT_EMR_URL",
-            "\"${System.getenv("RXSOFT_EMR_URL") ?: "http://10.0.2.2:8093/"}\""
+            "\"${System.getenv("RXSOFT_EMR_URL") ?: "http://10.0.2.2:8093/api/"}\""
         )
         buildConfigField(
             "String",
             "DEFAULT_CONVERSATION_URL",
-            "\"${System.getenv("RXSOFT_CONVERSATION_URL") ?: "http://10.0.2.2:8090/api"}\""
+            "\"${System.getenv("RXSOFT_CONVERSATION_URL") ?: "http://10.0.2.2:8090/api/"}\""
         )
         buildConfigField(
             "String",
             "DEFAULT_WEB_CHANNEL_CODE",
             "\"PROGNOCARE_MESSAGING\""
+        )
+
+        // ── Social sign-in ────────────────────────────────────────────
+        // Web OAuth client ID — audience of the Credential Manager ID token;
+        // the identity service verifies `aud` against the same value.
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"763036387173-jml5o3iauj2ms5269dqf7qq24gplh6mq.apps.googleusercontent.com\""
+        )
+        // Facebook app id + client token are public; the app secret stays in
+        // the identity service env only. Overridable via git-ignored
+        // local.properties or env at build time.
+        val localProps = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        manifestPlaceholders["FACEBOOK_APP_ID"] =
+            (localProps.getProperty("FACEBOOK_APP_ID") as String?)
+                ?: System.getenv("FACEBOOK_APP_ID") ?: "28296926366638041"
+        manifestPlaceholders["FACEBOOK_CLIENT_TOKEN"] =
+            (localProps.getProperty("FACEBOOK_CLIENT_TOKEN") as String?)
+                ?: System.getenv("FACEBOOK_CLIENT_TOKEN") ?: ""
+        resValue("string", "fb_login_protocol_scheme", "fb${manifestPlaceholders["FACEBOOK_APP_ID"]}")
+        buildConfigField(
+            "String",
+            "FACEBOOK_APP_ID",
+            "\"${manifestPlaceholders["FACEBOOK_APP_ID"]}\""
         )
     }
 
@@ -102,6 +131,12 @@ dependencies {
 
     // Socket.IO
     implementation(libs.socketio.client)
+
+    // Social sign-in (Google Credential Manager + Facebook Login)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.facebook.login)
 
     // Testing
     testImplementation(libs.junit)

@@ -15,25 +15,25 @@ import retrofit2.http.Query
 
 interface PaymentProviderApi {
 
-    @GET("api/payment-providers")
+    @GET("payment-providers")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
         @Query("search") search: String? = null,
     ): Response<PaginatedResponse<PaymentProvider>>
 
-    @POST("api/payment-providers")
+    @POST("payment-providers")
     suspend fun create(@Body dto: CreatePaymentProviderDto): Response<PaymentProvider>
 
-    @GET("api/payment-providers/{id}")
+    @GET("payment-providers/{id}")
     suspend fun getById(@Path("id") id: String): Response<PaymentProvider>
 
-    @PATCH("api/payment-providers/{id}")
+    @PATCH("payment-providers/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdatePaymentProviderDto,
     ): Response<PaymentProvider>
 
-    @DELETE("api/payment-providers/{id}")
+    @DELETE("payment-providers/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }

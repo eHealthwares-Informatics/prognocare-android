@@ -77,6 +77,90 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Google social sign-in: the Credential Manager ID token is verified
+     * server-side by the EMR (identity, channel='emr'); any existing account
+     * role is linked by the provider-verified email, otherwise a patient
+     * account is auto-registered. Session bootstrapping mirrors [login].
+     */
+    fun loginWithGoogle(idToken: String) {
+        if (idToken.isBlank()) {
+            _state.value = LoginState.Error("Google sign-in returned no token")
+            return
+        }
+        if (_state.value is LoginState.Loading) return
+        _state.value = LoginState.Loading
+        viewModelScope.launch {
+            try {
+                val authApi = retrofitClient.apis.value.authApi
+                val resp = authApi.googleSignIn(googleAuthRequest(idToken))
+                if (!resp.isSuccessful || resp.body() == null) {
+                    _state.value = LoginState.Error(
+                        "Google sign-in failed: ${resp.code()} ${resp.message()}",
+                    )
+                    return@launch
+                }
+                AuthInterceptor.saveToken(context, resp.body()!!.accessToken)
+                finishSessionBootstrap()
+            } catch (e: Exception) {
+                _state.value = LoginState.Error("Network error: ${e.message}")
+            }
+        }
+    }
+
+    /** Facebook social sign-in (verified server-side; see [loginWithGoogle]). */
+    fun loginWithFacebook(accessToken: String) {
+        if (accessToken.isBlank()) {
+            _state.value = LoginState.Error("Facebook sign-in returned no token")
+            return
+        }
+        if (_state.value is LoginState.Loading) return
+        _state.value = LoginState.Loading
+        viewModelScope.launch {
+            try {
+                val authApi = retrofitClient.apis.value.authApi
+                val resp = authApi.facebookSignIn(facebookAuthRequest(accessToken))
+                if (!resp.isSuccessful || resp.body() == null) {
+                    _state.value = LoginState.Error(
+                        "Facebook sign-in failed: ${resp.code()} ${resp.message()}",
+                    )
+                    return@launch
+                }
+                AuthInterceptor.saveToken(context, resp.body()!!.accessToken)
+                finishSessionBootstrap()
+            } catch (e: Exception) {
+                _state.value = LoginState.Error("Network error: ${e.message}")
+            }
+        }
+    }
+
+    /** Shared post-token bootstrap: /auth/me → roles, staff linkage, splash state. */
+    private suspend fun finishSessionBootstrap() {
+        val authApi = retrofitClient.apis.value.authApi
+        val meResp = authApi.me()
+        if (!meResp.isSuccessful || meResp.body() == null) {
+            _state.value = LoginState.Error(
+                "Could not load profile: ${meResp.code()} ${meResp.message()}",
+            )
+            return
+        }
+        val me = meResp.body()!!
+        SessionStore.saveUserId(context, me.id)
+        val role = UserRoleMapper.map(me)
+        SplashViewModel.saveAuthState(context, role)
+        SessionStore.saveRole(context, role)
+        resolveStaff(me.id)
+        _state.value = LoginState.Success(role)
+    }
+
+    /** Build the Google request DTO from the credential ID token. */
+    private fun googleAuthRequest(idToken: String) =
+        com.ehealthinformatics.prognocare.data.remote.models.GoogleAuthRequest(idToken = idToken)
+
+    /** Build the Facebook request DTO from the LoginManager access token. */
+    private fun facebookAuthRequest(accessToken: String) =
+        com.ehealthinformatics.prognocare.data.remote.models.FacebookAuthRequest(accessToken = accessToken)
+
     private suspend fun resolveStaff(userId: String) {
         runCatching {
             val response = retrofitClient.apis.value.staffApi.list(userId = userId, limit = 1)

@@ -14,7 +14,7 @@ import retrofit2.http.Query
 
 interface MedicationApi {
 
-    @GET("api/medications")
+    @GET("medications")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50,
@@ -25,18 +25,18 @@ interface MedicationApi {
         @Query("administered") administered: String? = null,
     ): Response<PaginatedResponse<Medication>>
 
-    @GET("api/medications/{id}")
+    @GET("medications/{id}")
     suspend fun getById(@Path("id") id: String): Response<Medication>
 
-    @POST("api/medications")
+    @POST("medications")
     suspend fun create(@Body dto: CreateMedicationDto): Response<Medication>
 
-    @POST("api/medications/{id}/administer")
+    @POST("medications/{id}/administer")
     suspend fun administer(
         @Path("id") id: String,
         @Body dto: AdministerMedicationDto,
     ): Response<Medication>
 
-    @DELETE("api/medications/{id}")
+    @DELETE("medications/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }

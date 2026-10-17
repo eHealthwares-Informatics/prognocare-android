@@ -9,13 +9,13 @@ import retrofit2.http.Query
 
 interface LocationApi {
 
-    @GET("api/locations")
+    @GET("locations")
     suspend fun list(
         @Query("search") search: String? = null,
         @Query("limit") limit: Int = 20,
         @Query("page") page: Int = 1,
     ): Response<PaginatedResponse<Location>>
 
-    @GET("api/locations/{id}")
+    @GET("locations/{id}")
     suspend fun getById(@Path("id") id: String): Response<Location>
 }

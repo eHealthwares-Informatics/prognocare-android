@@ -93,8 +93,9 @@ class DoctorDashboardViewModel @Inject constructor(
                 }.getOrDefault(summary?.metrics?.totalPatients ?: 0)
 
                 // Self-scoped when a staff record is linked; falls back to the clinic-wide view.
+                // Date window: settings query range → today (defaultToday).
                 val myAppointments: List<Appointment> = appointmentsRepository.list(
-                    AppointmentQuery(date = today.toString(), providerId = staffId, limit = 50),
+                    AppointmentQuery(providerId = staffId, limit = 50, defaultToday = true),
                 )
                 val myEncounters = runCatching {
                     emrRepository.encounters(limit = 100).filter { it.providerId == staffId }

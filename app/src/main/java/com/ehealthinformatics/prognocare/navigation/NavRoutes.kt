@@ -36,7 +36,10 @@ object DoctorRoutes {
 
 object NurseRoutes {
     const val DASHBOARD = "nurse/dashboard"
+    /** Vitals history list (FAB opens the recording form). */
     const val VITALS = "nurse/vitals"
+    /** Vitals recording form. */
+    const val VITALS_RECORD = "nurse/vitals/record"
     const val PATIENT_LIST = "nurse/patients"
     const val CHECKIN = "nurse/checkin"
     const val MEDICATIONS = "nurse/medications"
@@ -151,7 +154,13 @@ object ProfileRoutes {
 object ClinicalRoutes {
     const val APPOINTMENTS = "clinical/appointments"
     const val VISITS = "clinical/visits"
+    const val VISIT_DETAIL = "clinical/visits/{visitId}"
     const val ENCOUNTERS = "clinical/encounters"
+    const val ADMISSIONS = "clinical/admissions"
+    const val ADMISSION_DETAIL = "clinical/admissions/{admissionId}"
+
+    fun visitDetail(visitId: String) = "clinical/visits/$visitId"
+    fun admissionDetail(admissionId: String) = "clinical/admissions/$admissionId"
 }
 
 // ── Forms (dynamic documentation, shared) ──────────────────────

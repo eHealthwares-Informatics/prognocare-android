@@ -8,12 +8,12 @@ import retrofit2.http.Query
 
 interface DashboardApi {
 
-    @GET("api/dashboard")
+    @GET("dashboard")
     suspend fun summary(
         @Query("date") date: String? = null,
     ): Response<DashboardSummary>
 
-    @GET("api/dashboard/attended-patients")
+    @GET("dashboard/attended-patients")
     suspend fun attendedPatients(
         @Query("providerId") providerId: String? = null,
     ): Response<AttendedPatientsResponse>

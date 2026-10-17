@@ -18,7 +18,7 @@ import retrofit2.http.Query
 
 interface AppointmentApi {
 
-    @GET("api/appointments")
+    @GET("appointments")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -31,36 +31,36 @@ interface AppointmentApi {
         @Query("sortOrder") sortOrder: String? = null,
     ): Response<PaginatedResponse<Appointment>>
 
-    @POST("api/appointments")
+    @POST("appointments")
     suspend fun create(@Body dto: CreateAppointmentDto): Response<Appointment>
 
-    @GET("api/appointments/{id}")
+    @GET("appointments/{id}")
     suspend fun getById(@Path("id") id: String): Response<Appointment>
 
-    @PATCH("api/appointments/{id}")
+    @PATCH("appointments/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdateAppointmentDto,
     ): Response<Appointment>
 
-    @DELETE("api/appointments/{id}")
+    @DELETE("appointments/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 
-    @POST("api/appointments/{id}/check-in")
+    @POST("appointments/{id}/check-in")
     suspend fun checkIn(
         @Path("id") id: String,
         @Body dto: CheckInAppointmentDto = CheckInAppointmentDto(),
     ): Response<CheckInResponse>
 
-    @POST("api/appointments/{id}/cancel")
+    @POST("appointments/{id}/cancel")
     suspend fun cancel(
         @Path("id") id: String,
         @Body dto: CancelAppointmentDto,
     ): Response<Appointment>
 
-    @POST("api/appointments/{id}/no-show")
+    @POST("appointments/{id}/no-show")
     suspend fun noShow(@Path("id") id: String): Response<Appointment>
 
-    @POST("api/appointments/{id}/complete")
+    @POST("appointments/{id}/complete")
     suspend fun complete(@Path("id") id: String): Response<Appointment>
 }

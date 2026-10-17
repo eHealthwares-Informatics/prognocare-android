@@ -15,7 +15,7 @@ import retrofit2.http.Query
 
 interface PatientApi {
 
-    @GET("api/patients")
+    @GET("patients")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -25,21 +25,21 @@ interface PatientApi {
         @Query("filter") filter: String? = null,
     ): Response<PaginatedResponse<Patient>>
 
-    @POST("api/patients")
+    @POST("patients")
     suspend fun create(@Body dto: CreatePatientDto): Response<Patient>
 
-    @GET("api/patients/{id}")
+    @GET("patients/{id}")
     suspend fun getById(@Path("id") id: String): Response<Patient>
 
-    @GET("api/patients/by-mrn/{patientId}")
+    @GET("patients/by-mrn/{patientId}")
     suspend fun getByMrn(@Path("patientId") mrn: String): Response<Patient>
 
-    @PATCH("api/patients/{id}")
+    @PATCH("patients/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdatePatientDto,
     ): Response<Patient>
 
-    @DELETE("api/patients/{id}")
+    @DELETE("patients/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }

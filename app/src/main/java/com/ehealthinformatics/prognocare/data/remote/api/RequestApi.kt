@@ -19,7 +19,7 @@ import retrofit2.http.Query
 
 interface RequestApi {
 
-    @GET("api/requests")
+    @GET("requests")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -30,37 +30,37 @@ interface RequestApi {
         @Query("status") status: String? = null,
     ): Response<PaginatedResponse<ClinicalRequest>>
 
-    @POST("api/requests")
+    @POST("requests")
     suspend fun create(@Body dto: CreateRequestDto): Response<ClinicalRequest>
 
-    @GET("api/requests/{id}")
+    @GET("requests/{id}")
     suspend fun getById(@Path("id") id: String): Response<ClinicalRequest>
 
-    @PATCH("api/requests/{id}")
+    @PATCH("requests/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdateRequestDto,
     ): Response<ClinicalRequest>
 
-    @DELETE("api/requests/{id}")
+    @DELETE("requests/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 
-    @GET("api/requests/{id}/history")
+    @GET("requests/{id}/history")
     suspend fun getHistory(@Path("id") id: String): Response<List<RequestHistoryEntry>>
 
-    @POST("api/requests/{id}/transition")
+    @POST("requests/{id}/transition")
     suspend fun transition(
         @Path("id") id: String,
         @Body dto: TransitionRequestStatusDto,
     ): Response<ClinicalRequest>
 
-    @POST("api/requests/{id}/note")
+    @POST("requests/{id}/note")
     suspend fun addNote(
         @Path("id") id: String,
         @Body dto: AddRequestNoteDto,
     ): Response<Unit>
 
-    @POST("api/requests/{id}/sync")
+    @POST("requests/{id}/sync")
     suspend fun sync(
         @Path("id") id: String,
         @Body dto: SyncRequestDto,

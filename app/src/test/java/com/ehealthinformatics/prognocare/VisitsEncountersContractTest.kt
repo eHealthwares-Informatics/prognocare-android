@@ -134,7 +134,7 @@ class VisitsEncountersContractTest {
         val ended = api.end("vis-1")
         assertTrue(ended.isSuccessful)
         assertEquals("COMPLETED", ended.body()!!.status)
-        assertEquals("/api/visits/vis-1/end", server.takeRequest().path)
+        assertEquals("/visits/vis-1/end", server.takeRequest().path)
 
         server.enqueue(
             MockResponse().setResponseCode(200).setBody("""{ "id": "vis-1", "status": "CANCELLED" }"""),
@@ -142,7 +142,7 @@ class VisitsEncountersContractTest {
         val cancelled = api.cancel("vis-1")
         assertTrue(cancelled.isSuccessful)
         assertEquals("CANCELLED", cancelled.body()!!.status)
-        assertEquals("/api/visits/vis-1/cancel", server.takeRequest().path)
+        assertEquals("/visits/vis-1/cancel", server.takeRequest().path)
     }
 
     @Test

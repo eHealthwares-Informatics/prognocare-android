@@ -24,7 +24,15 @@ data class Staff(
     val updatedAt: String? = null,
 ) {
     val displayName: String
-        get() = "$firstName $lastName"
+        get() = "$firstName $lastName".trim()
+
+    /** Name with department in brackets, e.g. `Dr. Fatima Bello (Cardiology)`. */
+    val displayWithDepartment: String
+        get() {
+            val name = displayName
+            val dept = department?.trim().orEmpty()
+            return if (dept.isEmpty()) name else "$name ($dept)"
+        }
 
     val roleDisplay: String
         get() = roleType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }

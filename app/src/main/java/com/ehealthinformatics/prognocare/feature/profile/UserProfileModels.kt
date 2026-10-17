@@ -18,7 +18,12 @@ data class UserProfile(
 )
 
 data class UserProfileState(
-    val isLoading: Boolean = true,
+    /**
+     * True only for the brief local seed on first frame. Network refresh uses
+     * [isRefreshing] so the screen is interactive immediately.
+     */
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val profile: UserProfile? = null,
     val isSigningOut: Boolean = false,
 )

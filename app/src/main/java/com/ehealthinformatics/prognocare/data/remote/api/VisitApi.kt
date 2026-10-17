@@ -16,7 +16,7 @@ import retrofit2.http.Query
 
 interface VisitApi {
 
-    @GET("api/visits")
+    @GET("visits")
     suspend fun list(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
@@ -25,30 +25,30 @@ interface VisitApi {
         @Query("patientId") patientId: String? = null,
     ): Response<PaginatedResponse<Visit>>
 
-    @POST("api/visits")
+    @POST("visits")
     suspend fun create(@Body dto: CreateVisitDto): Response<Visit>
 
-    @GET("api/visits/active")
+    @GET("visits/active")
     suspend fun active(): Response<List<Visit>>
 
-    @GET("api/visits/{id}")
+    @GET("visits/{id}")
     suspend fun getById(@Path("id") id: String): Response<Visit>
 
-    @PATCH("api/visits/{id}")
+    @PATCH("visits/{id}")
     suspend fun update(
         @Path("id") id: String,
         @Body dto: UpdateVisitDto,
     ): Response<Visit>
 
-    @DELETE("api/visits/{id}")
+    @DELETE("visits/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
 
-    @POST("api/visits/{id}/end")
+    @POST("visits/{id}/end")
     suspend fun end(
         @Path("id") id: String,
         @Body dto: EndVisitDto = EndVisitDto(),
     ): Response<Visit>
 
-    @POST("api/visits/{id}/cancel")
+    @POST("visits/{id}/cancel")
     suspend fun cancel(@Path("id") id: String): Response<Visit>
 }
