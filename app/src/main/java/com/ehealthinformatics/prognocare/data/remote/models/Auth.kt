@@ -9,6 +9,17 @@ data class LoginDto(
 )
 
 @Serializable
+data class FacebookAuthRequest(
+    val accessToken: String,
+)
+
+@Serializable
+data class GoogleAuthRequest(
+    val idToken: String? = null,
+    val accessToken: String? = null,
+)
+
+@Serializable
 data class AuthResponse(
     val accessToken: String = "",
     val refreshToken: String = "",

@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -64,7 +66,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ehealthinformatics.prognocare.BuildConfig
 import com.ehealthinformatics.prognocare.R
 import com.ehealthinformatics.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthinformatics.prognocare.designsystem.theme.Primary
@@ -74,6 +82,11 @@ import com.ehealthinformatics.prognocare.feature.settings.ServerConfigContent
 import com.ehealthinformatics.prognocare.feature.settings.SettingsViewModel
 import com.ehealthinformatics.prognocare.feature.settings.TapCounter
 import com.ehealthinformatics.prognocare.navigation.UserRole
+import com.facebook.login.LoginManager
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -92,7 +105,13 @@ fun LoginScreen(
     val config by settingsViewModel.config.collectAsState()
     val isVerifying by settingsViewModel.isVerifying.collectAsState()
     val saveResult by settingsViewModel.saveResult.collectAsState()
+    val discovery by settingsViewModel.discovery.collectAsState()
     var loginError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val credentialManager = remember { CredentialManager.create(context) }
+    var googleBusy by remember { mutableStateOf(false) }
+    var facebookBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(isLoading) {
         when (val s = isLoading) {
@@ -477,13 +496,92 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 SocialLoginButton(
-                    text = "Google",
-                    onClick = { /* TODO: Google login */ },
+                    text = if (googleBusy) "Signing in…" else "Google",
+                    onClick = {
+                        if (googleBusy || isLoading is LoginState.Loading) {
+                            return@SocialLoginButton
+                        }
+                        googleBusy = true
+                        loginError = null
+                        scope.launch {
+                            try {
+                                val googleIdOption = GetGoogleIdOption.Builder()
+                                    // Audience of the returned ID token — the backend
+                                    // verifies `aud` against the same web client ID.
+                                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .build()
+                                val request = GetCredentialRequest.Builder()
+                                    .addCredentialOption(googleIdOption)
+                                    .build()
+                                val result = runCatching {
+                                    credentialManager.getCredential(context, request)
+                                }.getOrElse { e ->
+                                    // Some devices surface NoCredentialException even
+                                    // when accounts exist; the explicit flow always
+                                    // launches its own account chooser.
+                                    if (e is NoCredentialException) {
+                                        val explicit = GetCredentialRequest.Builder()
+                                            .addCredentialOption(
+                                                GetSignInWithGoogleOption.Builder(
+                                                    BuildConfig.GOOGLE_WEB_CLIENT_ID,
+                                                ).build(),
+                                            )
+                                            .build()
+                                        credentialManager.getCredential(context, explicit)
+                                    } else {
+                                        throw e
+                                    }
+                                }
+                                val credential = result.credential
+                                if (credential is GoogleIdTokenCredential) {
+                                    loginViewModel.signInWithGoogle(credential.idToken)
+                                } else {
+                                    loginError = "Unexpected Google credential type"
+                                }
+                            } catch (_: GetCredentialCancellationException) {
+                                // User closed the account sheet — not an error.
+                            } catch (_: NoCredentialException) {
+                                loginError =
+                                    "No Google account on this device. Add one in " +
+                                        "Settings → Google and try again."
+                            } catch (e: GetCredentialException) {
+                                loginError = "Google sign-in unavailable (${e.type})"
+                            } finally {
+                                googleBusy = false
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
                 SocialLoginButton(
-                    text = "Apple",
-                    onClick = { /* TODO: Apple login */ },
+                    text = if (facebookBusy) "Signing in…" else "Facebook",
+                    onClick = {
+                        if (facebookBusy || isLoading is LoginState.Loading) {
+                            return@SocialLoginButton
+                        }
+                        val activity = context as? android.app.Activity
+                        if (activity == null) {
+                            loginError = "Facebook sign-in unavailable"
+                            return@SocialLoginButton
+                        }
+                        facebookBusy = true
+                        loginError = null
+                        // One-shot handler: the SDK answers through MainActivity's
+                        // onActivityResult → FacebookAuthBridge.
+                        FacebookAuthBridge.onFacebookResult = { token, cancelled, error ->
+                            when {
+                                cancelled -> Unit
+                                error != null -> loginError = error
+                                token != null -> loginViewModel.signInWithFacebook(token)
+                            }
+                            facebookBusy = false
+                        }
+                        LoginManager.getInstance().logInWithReadPermissions(
+                            activity,
+                            listOf("public_profile", "email"),
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -539,6 +637,9 @@ fun LoginScreen(
                         onReset = { settingsViewModel.resetToDefaults() },
                         isVerifying = isVerifying,
                         saveResult = saveResult,
+                        discovery = discovery,
+                        onDiscover = settingsViewModel::discoverServers,
+                        onDismissDiscovery = settingsViewModel::dismissDiscovery,
                     )
                 }
             }

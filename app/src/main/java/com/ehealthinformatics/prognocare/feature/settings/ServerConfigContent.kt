@@ -9,14 +9,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -30,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.ehealthinformatics.prognocare.data.config.AppConfig
 import com.ehealthinformatics.prognocare.data.config.ConnectionCheck
@@ -47,6 +52,9 @@ fun ServerConfigContent(
     modifier: Modifier = Modifier,
     isVerifying: Boolean = false,
     saveResult: SaveResult? = null,
+    discovery: DiscoveryState = DiscoveryState(),
+    onDiscover: () -> Unit = {},
+    onDismissDiscovery: () -> Unit = {},
 ) {
     var emrUrl by rememberSaveable { mutableStateOf(config.emrBaseUrl) }
     var conversationUrl by rememberSaveable { mutableStateOf(config.conversationBaseUrl) }
@@ -86,7 +94,61 @@ fun ServerConfigContent(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 ),
+                // Sweeps the local network (Wi-Fi or this phone's hotspot) for a
+                // running server and fills the field with the URL it answers on.
+                trailingIcon = {
+                    IconButton(
+                        onClick = onDiscover,
+                        enabled = !discovery.scanning,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Discover server on this network"
+                        },
+                    ) {
+                        if (discovery.scanning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                },
             )
+
+            if (discovery.servers.isNotEmpty()) {
+                Text(
+                    text = "Found on this network",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                discovery.servers.forEach { url ->
+                    Text(
+                        text = url,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { emrUrl = url }
+                            .padding(vertical = Spacing.xs)
+                            .semantics { contentDescription = "Use server $url" },
+                    )
+                }
+                TextButton(onClick = onDismissDiscovery) { Text("Dismiss") }
+            }
+
+            discovery.message?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                TextButton(onClick = onDismissDiscovery) { Text("Dismiss") }
+            }
 
             OutlinedTextField(
                 value = conversationUrl,

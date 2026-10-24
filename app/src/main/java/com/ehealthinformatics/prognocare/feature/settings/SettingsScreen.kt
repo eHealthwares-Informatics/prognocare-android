@@ -35,6 +35,7 @@ fun SettingsScreen(
     val config by viewModel.config.collectAsState()
     val isVerifying by viewModel.isVerifying.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
+    val discovery by viewModel.discovery.collectAsState()
 
     Scaffold(
         topBar = {
@@ -76,6 +77,9 @@ fun SettingsScreen(
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
                 saveResult = saveResult,
+                discovery = discovery,
+                onDiscover = viewModel::discoverServers,
+                onDismissDiscovery = viewModel::dismissDiscovery,
                 modifier = Modifier.weight(0f),
             )
 

@@ -1,5 +1,6 @@
 package com.ehealthinformatics.prognocare
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,6 +12,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.ehealthinformatics.prognocare.designsystem.theme.AppearanceMode
 import com.ehealthinformatics.prognocare.designsystem.theme.PrognoCareTheme
 import com.ehealthinformatics.prognocare.designsystem.theme.ThemeViewModel
+import com.ehealthinformatics.prognocare.feature.auth.FacebookAuthBridge
 import com.ehealthinformatics.prognocare.navigation.PrognoCareNavGraph
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -31,5 +33,11 @@ class MainActivity : ComponentActivity() {
                 PrognoCareNavGraph()
             }
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // Facebook Login resolves through the classic activity-result route.
+        if (FacebookAuthBridge.onActivityResult(requestCode, resultCode, data)) return
+        super.onActivityResult(requestCode, resultCode, data)
     }
 }

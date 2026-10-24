@@ -35,6 +35,25 @@ android {
             "DEFAULT_WEB_CHANNEL_CODE",
             "\"PROGNOCARE_MESSAGING\""
         )
+        // Google Identity web client ID used as Credential Manager `serverClientId`.
+        // Client IDs are public (embedded in every sign-in request); the client
+        // SECRET never ships in the app — it stays in the identity service env only.
+        // Overridable per machine via the GOOGLE_WEB_CLIENT_ID env var.
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: "763036387173-jml5o3iauj2ms5269dqf7qq24gplh6mq.apps.googleusercontent.com"}\""
+        )
+        // Facebook app id + client token are public (embedded in every login
+        // request); the app secret stays in the identity service env only.
+        // Overridable per machine via env vars.
+        val facebookAppId = System.getenv("FACEBOOK_APP_ID") ?: "28296926366638041"
+        manifestPlaceholders["FACEBOOK_APP_ID"] = facebookAppId
+        manifestPlaceholders["FACEBOOK_CLIENT_TOKEN"] =
+            System.getenv("FACEBOOK_CLIENT_TOKEN") ?: ""
+        // fb<APP_ID>:// return scheme for the Chrome Custom Tab login callback.
+        resValue("string", "fb_login_protocol_scheme", "fb$facebookAppId")
+        buildConfigField("String", "FACEBOOK_APP_ID", "\"$facebookAppId\"")
     }
 
     buildTypes {
@@ -99,6 +118,10 @@ dependencies {
     implementation(libs.retrofit.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.facebook.login)
 
     // Socket.IO
     implementation(libs.socketio.client)
