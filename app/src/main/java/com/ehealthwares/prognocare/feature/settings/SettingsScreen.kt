@@ -38,6 +38,7 @@ fun SettingsScreen(
     val saveResult by viewModel.saveResult.collectAsState()
     val dateRangeSaving by viewModel.dateRangeSaving.collectAsState()
     val dateRangeMessage by viewModel.dateRangeMessage.collectAsState()
+    val discovery by viewModel.discovery.collectAsState()
 
     Scaffold(
         topBar = {
@@ -81,6 +82,9 @@ fun SettingsScreen(
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
                 saveResult = saveResult,
+                discovery = discovery,
+                onDiscover = viewModel::discoverServers,
+                onDismissDiscovery = viewModel::dismissDiscovery,
                 modifier = Modifier.fillMaxWidth(),
             )
 

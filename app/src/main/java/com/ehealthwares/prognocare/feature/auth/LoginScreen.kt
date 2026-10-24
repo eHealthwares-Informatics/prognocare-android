@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +78,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ehealthwares.prognocare.R
 import com.ehealthwares.prognocare.designsystem.theme.AppThemeColors
@@ -106,7 +106,13 @@ fun LoginScreen(
     val config by settingsViewModel.config.collectAsState()
     val isVerifying by settingsViewModel.isVerifying.collectAsState()
     val saveResult by settingsViewModel.saveResult.collectAsState()
+    val discovery by settingsViewModel.discovery.collectAsState()
     var loginError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val credentialManager = remember { CredentialManager.create(context) }
+    var googleBusy by remember { mutableStateOf(false) }
+    var facebookBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(isLoading) {
         when (val s = isLoading) {
@@ -646,6 +652,9 @@ fun LoginScreen(
                         onReset = { settingsViewModel.resetToDefaults() },
                         isVerifying = isVerifying,
                         saveResult = saveResult,
+                        discovery = discovery,
+                        onDiscover = settingsViewModel::discoverServers,
+                        onDismissDiscovery = settingsViewModel::dismissDiscovery,
                     )
                 }
             }
