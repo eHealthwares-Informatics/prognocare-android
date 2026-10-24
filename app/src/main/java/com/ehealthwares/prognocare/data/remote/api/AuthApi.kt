@@ -17,10 +17,10 @@ interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body dto: LoginDto): Response<AuthResponse>
 
-    @POST("auth/google")
+    @POST("auth/oauth/google")
     suspend fun googleSignIn(@Body dto: GoogleAuthRequest): Response<AuthResponse>
 
-    @POST("auth/facebook")
+    @POST("auth/oauth/facebook")
     suspend fun facebookSignIn(@Body dto: FacebookAuthRequest): Response<AuthResponse>
 
     @GET("auth/me")

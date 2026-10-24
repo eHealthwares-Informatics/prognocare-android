@@ -146,6 +146,10 @@ dependencies {
     implementation(libs.retrofit.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.facebook.login)
 
     // Socket.IO
     implementation(libs.socketio.client)
