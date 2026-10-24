@@ -1,5 +1,10 @@
 import java.util.Properties
 
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -9,11 +14,20 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 android {
-    namespace = "com.ehealthinformatics.prognocare"
+    namespace = "com.ehealthwares.prognocare"
     compileSdk = 35
 
+    signingConfigs {
+        release {
+            storeFile.set(file(localProperties.getProperty("RELEASE_KEYSTORE_PATH") ?: ""))
+            storePassword.set(localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD") ?: "")
+            keyAlias.set(localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "release")
+            keyPassword.set(localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: "")
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.ehealthinformatics.prognocare"
+        applicationId = "com.ehealthwares.prognocare"
         minSdk = 32
         targetSdk = 35
         versionCode = 1
@@ -73,6 +87,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {
@@ -128,6 +143,10 @@ dependencies {
     implementation(libs.retrofit.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.facebook.login)
 
     // Socket.IO
     implementation(libs.socketio.client)

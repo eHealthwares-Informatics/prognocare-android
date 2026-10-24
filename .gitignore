@@ -12,4 +12,8 @@
 /captures
 .externalNativeBuild
 .cxx
+
+# Release signing keystore (never commit private keys)
+ehealthwares-release-keystore.jks
+
 local.properties
