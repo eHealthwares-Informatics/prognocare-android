@@ -17,15 +17,6 @@ android {
     namespace = "com.ehealthwares.prognocare"
     compileSdk = 35
 
-    signingConfigs {
-        release {
-            storeFile.set(file(localProperties.getProperty("RELEASE_KEYSTORE_PATH") ?: ""))
-            storePassword.set(localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD") ?: "")
-            keyAlias.set(localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "release")
-            keyPassword.set(localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: "")
-        }
-    }
-
     defaultConfig {
         applicationId = "com.ehealthwares.prognocare"
         minSdk = 32
@@ -87,7 +78,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig signingConfigs.release
         }
     }
     compileOptions {
@@ -102,6 +92,14 @@ android {
         buildConfig = true
     }
 }
+
+// ── Release signing (configured after the android block for Kotlin DSL compatibility) ──
+val releaseSigningConfig = android.signingConfigs.create("release")
+releaseSigningConfig.setStoreFile(file(localProperties.getProperty("RELEASE_KEYSTORE_PATH") ?: ""))
+releaseSigningConfig.setStorePassword(localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD") ?: "")
+releaseSigningConfig.setKeyAlias(localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "release")
+releaseSigningConfig.setKeyPassword(localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: "")
+android.buildTypes.getByName("release").setSigningConfig(releaseSigningConfig)
 
 dependencies {
     // Core
