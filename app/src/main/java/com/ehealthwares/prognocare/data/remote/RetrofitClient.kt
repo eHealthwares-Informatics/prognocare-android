@@ -59,6 +59,7 @@ data class ApiBundle(
 @Singleton
 class RetrofitClient @Inject constructor(
     private val authInterceptor: AuthInterceptor,
+    private val tenantInterceptor: TenantInterceptor,
     private val configStore: AppConfigStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -74,6 +75,7 @@ class RetrofitClient @Inject constructor(
 
     private fun buildHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(authInterceptor)
+        .addInterceptor(tenantInterceptor)
         .addInterceptor(
             HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
