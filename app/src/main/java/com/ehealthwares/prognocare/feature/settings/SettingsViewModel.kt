@@ -9,9 +9,11 @@ import com.ehealthwares.prognocare.data.config.ServerConfigVerifier
 import com.ehealthwares.prognocare.data.config.ServerDiscovery
 import com.ehealthwares.prognocare.data.config.QueryRangePeriod
 import com.ehealthwares.prognocare.data.config.ServerEnvironment
+import com.ehealthwares.prognocare.data.config.withConceptsBaseUrl
 import com.ehealthwares.prognocare.data.config.withConversationBaseUrl
 import com.ehealthwares.prognocare.data.config.withEmrBaseUrl
 import com.ehealthwares.prognocare.data.config.withQueryRange
+import com.ehealthwares.prognocare.data.config.withRxsoftBaseUrl
 import com.ehealthwares.prognocare.data.config.withServerEnvironment
 import com.ehealthwares.prognocare.data.config.withWebChannelCode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -91,6 +93,8 @@ class SettingsViewModel @Inject constructor(
     fun saveConfig(
         emrBaseUrl: String,
         conversationBaseUrl: String,
+        conceptsBaseUrl: String,
+        rxsoftBaseUrl: String,
         webChannelCode: String,
         environment: ServerEnvironment? = null,
     ) {
@@ -104,6 +108,8 @@ class SettingsViewModel @Inject constructor(
                     .withServerEnvironment(env)
                     .withEmrBaseUrl(emrBaseUrl)
                     .withConversationBaseUrl(conversationBaseUrl)
+                    .withConceptsBaseUrl(conceptsBaseUrl)
+                    .withRxsoftBaseUrl(rxsoftBaseUrl)
                     .withWebChannelCode(webChannelCode)
 
                 val checks = verifier.verify(candidate)

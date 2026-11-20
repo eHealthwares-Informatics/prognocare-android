@@ -1,12 +1,16 @@
 package com.ehealthwares.prognocare.data.remote
 
+import com.ehealthwares.prognocare.data.config.AppConfig
 import com.ehealthwares.prognocare.data.config.AppConfigStore
 import com.ehealthwares.prognocare.data.remote.api.AdmissionApi
 import com.ehealthwares.prognocare.data.remote.api.AppointmentApi
+import com.ehealthwares.prognocare.data.remote.api.ConceptsApi
 import com.ehealthwares.prognocare.data.remote.api.DashboardApi
+import com.ehealthwares.prognocare.data.remote.api.DepartmentApi
 import com.ehealthwares.prognocare.data.remote.api.EncounterApi
 import com.ehealthwares.prognocare.data.remote.api.FormApi
 import com.ehealthwares.prognocare.data.remote.api.HealthApi
+import com.ehealthwares.prognocare.data.remote.api.ItemsApi
 import com.ehealthwares.prognocare.data.remote.api.LocationApi
 import com.ehealthwares.prognocare.data.remote.api.MedicationApi
 import com.ehealthwares.prognocare.data.remote.api.NotificationApi
@@ -15,6 +19,7 @@ import com.ehealthwares.prognocare.data.remote.api.PaymentProviderApi
 import com.ehealthwares.prognocare.data.remote.api.RequestApi
 import com.ehealthwares.prognocare.data.remote.api.StaffApi
 import com.ehealthwares.prognocare.data.remote.api.ReferralApi
+import com.ehealthwares.prognocare.data.remote.api.UploadApi
 import com.ehealthwares.prognocare.data.remote.api.VisitApi
 import com.ehealthwares.prognocare.data.remote.api.AuthApi
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +59,10 @@ data class ApiBundle(
     val medicationApi: MedicationApi,
     val notificationApi: NotificationApi,
     val admissionApi: AdmissionApi,
+    val departmentApi: DepartmentApi,
+    val uploadApi: UploadApi,
+    val conceptsApi: ConceptsApi,
+    val itemsApi: ItemsApi,
 )
 
 @Singleton
@@ -90,8 +99,10 @@ class RetrofitClient @Inject constructor(
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
-    private fun buildBundle(baseUrl: String): ApiBundle {
-        val retrofit = buildRetrofit(baseUrl)
+    private fun buildBundle(config: AppConfig): ApiBundle {
+        val retrofit = buildRetrofit(config.emrBaseUrl)
+        val conceptsRetrofit = buildRetrofit(config.conceptsBaseUrl)
+        val rxsoftRetrofit = buildRetrofit(config.rxsoftBaseUrl)
         return ApiBundle(
             patientApi = retrofit.create(PatientApi::class.java),
             staffApi = retrofit.create(StaffApi::class.java),
@@ -109,11 +120,15 @@ class RetrofitClient @Inject constructor(
             medicationApi = retrofit.create(MedicationApi::class.java),
             notificationApi = retrofit.create(NotificationApi::class.java),
             admissionApi = retrofit.create(AdmissionApi::class.java),
+            departmentApi = retrofit.create(DepartmentApi::class.java),
+            uploadApi = retrofit.create(UploadApi::class.java),
+            conceptsApi = conceptsRetrofit.create(ConceptsApi::class.java),
+            itemsApi = rxsoftRetrofit.create(ItemsApi::class.java),
         )
     }
 
     /** Current API bundle, rebuilt whenever the EMR base URL config changes. */
     val apis: StateFlow<ApiBundle> = configStore.config
-        .map { config -> buildBundle(config.emrBaseUrl) }
-        .stateIn(scope, SharingStarted.Eagerly, buildBundle(AppConfigStore.DEFAULT_EMR_URL))
+        .map { config -> buildBundle(config) }
+        .stateIn(scope, SharingStarted.Eagerly, buildBundle(AppConfig()))
 }

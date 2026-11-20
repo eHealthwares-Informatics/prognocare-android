@@ -120,6 +120,8 @@ class UserProfileViewModel @Inject constructor(
     fun saveServerConfig(
         emr: String,
         conversation: String,
+        concepts: String,
+        rxsoft: String,
         webChannelCode: String,
         environment: com.ehealthwares.prognocare.data.config.ServerEnvironment? = null,
     ) {
@@ -135,6 +137,12 @@ class UserProfileViewModel @Inject constructor(
                         },
                         conversationBaseUrl = conversation.trim().trimEnd('/')
                             .ifEmpty { current.conversationBaseUrl },
+                        conceptsBaseUrl = concepts.trim().trimEnd('/')
+                            .ifEmpty { current.conceptsBaseUrl }
+                            .let { if (it.endsWith("/")) it else "$it/" },
+                        rxsoftBaseUrl = rxsoft.trim().trimEnd('/')
+                            .ifEmpty { current.rxsoftBaseUrl }
+                            .let { if (it.endsWith("/")) it else "$it/" },
                         webChannelCode = webChannelCode.trim().ifEmpty { current.webChannelCode },
                     ),
             )

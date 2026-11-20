@@ -6,6 +6,8 @@ data class AdminDashboardState(
     val todayDate: String = "Tuesday, Aug 18",
     val totalPatients: Int = 0,
     val checkedInToday: Int = 0,
+    /** Total appointments scheduled for the day (check-in queue length). */
+    val totalAppointments: Int = 0,
     val waitingForCheckIn: Int = 0,
     val totalStaff: Int = 0,
     val activeVisits: Int = 0,

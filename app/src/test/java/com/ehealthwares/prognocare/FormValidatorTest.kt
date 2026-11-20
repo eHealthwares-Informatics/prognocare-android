@@ -80,4 +80,29 @@ class FormValidatorTest {
         val errors = FormValidator.validate(schema, mapOf("consent" to false))
         assertTrue(errors.any { it.contains("Consent is required") })
     }
+
+    @Test
+    fun `action-only field types never require a value`() {
+        val schema = FormSchemaData(
+            listOf(
+                field("print", "Print", FormFieldType.PRINT, required = true),
+                field("send", "Send", FormFieldType.SEND_FORM, required = true),
+                field("qr", "QR", FormFieldType.QR_CODE, required = true),
+                field("html", "Info", FormFieldType.HTML, required = true),
+            ),
+        )
+        assertTrue(FormValidator.validate(schema, emptyMap()).isEmpty())
+    }
+
+    @Test
+    fun `lookup fields accept object values`() {
+        val schema = FormSchemaData(
+            listOf(field("who", "Patient", FormFieldType.PATIENT, required = true)),
+        )
+        val errors = FormValidator.validate(
+            schema,
+            mapOf("who" to mapOf("id" to "P1", "patientId" to "MRN-1", "patientName" to "Jane")),
+        )
+        assertTrue(errors.isEmpty())
+    }
 }

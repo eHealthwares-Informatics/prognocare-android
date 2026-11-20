@@ -78,6 +78,7 @@ class AdminDashboardViewModel @Inject constructor(
                     checkedInToday = queue.count {
                         it.status in listOf(CheckInStatus.CHECKED_IN, CheckInStatus.IN_VISIT, CheckInStatus.CHECKED_OUT)
                     },
+                    totalAppointments = queue.size,
                     waitingForCheckIn = queue.count { it.status == CheckInStatus.WAITING },
                     totalStaff = staff.size,
                     activeVisits = summary?.metrics?.activeVisits ?: 0,

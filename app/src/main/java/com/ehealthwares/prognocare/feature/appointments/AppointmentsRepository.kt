@@ -2,6 +2,8 @@ package com.ehealthwares.prognocare.feature.appointments
 
 import com.ehealthwares.prognocare.data.config.AppConfigStore
 import com.ehealthwares.prognocare.data.config.resolveQueryDateRange
+import com.ehealthwares.prognocare.data.local.OfflineStore
+import com.ehealthwares.prognocare.data.network.ConnectivityObserver
 import com.ehealthwares.prognocare.data.remote.RetrofitClient
 import com.ehealthwares.prognocare.data.remote.models.Appointment
 import com.ehealthwares.prognocare.data.remote.models.CancelAppointmentDto
@@ -50,6 +52,8 @@ data class AppointmentQuery(
 class AppointmentsRepository @Inject constructor(
     private val retrofitClient: RetrofitClient,
     private val configStore: AppConfigStore,
+    private val offlineStore: OfflineStore,
+    private val connectivity: ConnectivityObserver,
 ) {
 
     /** Today's date as `yyyy-MM-dd` in the device timezone. */
@@ -87,9 +91,37 @@ class AppointmentsRepository @Inject constructor(
     }
 
     suspend fun create(dto: CreateAppointmentDto): Appointment {
-        val response = retrofitClient.apis.first().appointmentApi.create(dto)
-        if (!response.isSuccessful) throw failure(response)
-        return response.body() ?: throw ApiException(response.code(), "Empty response")
+        return try {
+            val response = retrofitClient.apis.first().appointmentApi.create(dto)
+            if (!response.isSuccessful) throw failure(response)
+            response.body() ?: throw ApiException(response.code(), "Empty response")
+        } catch (e: Exception) {
+            // Offline capture: queue the appointment and return a local placeholder.
+            if (!connectivity.online || e is java.io.IOException) {
+                offlineStore.enqueue(
+                    type = com.ehealthwares.prognocare.data.local.PendingActionType.APPOINTMENT,
+                    payload = syncJson.encodeToString(CreateAppointmentDto.serializer(), dto),
+                    localRef = dto.patientId.takeIf { it.startsWith("local-") },
+                )
+                return Appointment(
+                    id = "local-appt-${java.util.UUID.randomUUID()}",
+                    patientId = dto.patientId,
+                    patientName = dto.patientName.orEmpty(),
+                    appointmentType = dto.appointmentType,
+                    date = dto.date,
+                    startTime = dto.startTime,
+                    endTime = dto.endTime,
+                    providerId = dto.providerId,
+                    providerName = dto.providerName,
+                    locationId = dto.locationId,
+                    priority = dto.priority,
+                    status = "PENDING_SYNC",
+                    reason = dto.reason,
+                    notes = dto.notes,
+                )
+            }
+            throw e
+        }
     }
 
     suspend fun checkIn(id: String, dto: CheckInAppointmentDto = CheckInAppointmentDto()): Appointment {
@@ -118,13 +150,21 @@ class AppointmentsRepository @Inject constructor(
 
     /** Search patient records by name or MRN (used to schedule/self-identify). */
     suspend fun searchPatients(search: String, limit: Int = 20): List<Patient> {
-        val response = retrofitClient.apis.first().patientApi.list(
-            page = 1,
-            limit = limit,
-            search = search.takeIf { it.isNotBlank() },
-        )
-        if (!response.isSuccessful) throw failure(response)
-        return response.body()?.data.orEmpty()
+        return try {
+            val response = retrofitClient.apis.first().patientApi.list(
+                page = 1,
+                limit = limit,
+                search = search.takeIf { it.isNotBlank() },
+            )
+            if (!response.isSuccessful) throw failure(response)
+            val patients = response.body()?.data.orEmpty()
+            // Keep the on-device directory fresh for offline lookups.
+            offlineStore.cachePatients(patients)
+            patients
+        } catch (e: Exception) {
+            // Offline (or the server is unreachable): fall back to the cache.
+            if (!connectivity.online) offlineStore.searchPatients(search, limit) else throw e
+        }
     }
 
     /** Providers available for scheduling (Doctor role type). */
@@ -145,5 +185,13 @@ class AppointmentsRepository @Inject constructor(
             response.code(),
             detail ?: "${response.code()} ${response.message()}",
         )
+    }
+
+    private companion object {
+        val syncJson = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+            explicitNulls = false
+        }
     }
 }

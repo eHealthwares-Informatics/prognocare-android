@@ -15,7 +15,14 @@ object FormValidator {
 
     private fun validateField(field: FormField, data: FormData, errors: MutableList<String>) {
         when (field.type) {
-            FormFieldType.SECTION, FormFieldType.TABLE -> return
+            // Container / non-input / mobile-hidden action types.
+            FormFieldType.SECTION,
+            FormFieldType.TABLE,
+            FormFieldType.HTML,
+            FormFieldType.HIDDEN,
+            FormFieldType.QR_CODE,
+            FormFieldType.PRINT,
+            FormFieldType.SEND_FORM -> return
             FormFieldType.TAB, FormFieldType.COL -> {
                 for (child in field.fields) validateField(child, data, errors)
                 return

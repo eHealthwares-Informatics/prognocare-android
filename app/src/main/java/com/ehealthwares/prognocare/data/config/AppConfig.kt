@@ -30,8 +30,12 @@ enum class QueryRangePeriod(val id: String, val label: String) {
 
 @Serializable
 data class AppConfig(
-    val emrBaseUrl: String = AppConfigStore.DEFAULT_EMR_URL,
-    val conversationBaseUrl: String = AppConfigStore.DEFAULT_CONVERSATION_URL,
+    val emrBaseUrl: String = ServerEnvironment.PRODUCTION.emrBaseUrl,
+    val conversationBaseUrl: String = ServerEnvironment.PRODUCTION.conversationBaseUrl,
+    /** Concepts (LOINC/DICOM/generic catalogue) service base URL. */
+    val conceptsBaseUrl: String = ServerEnvironment.PRODUCTION.conceptsBaseUrl,
+    /** rxsoft (inventory / stock items) service base URL. */
+    val rxsoftBaseUrl: String = ServerEnvironment.PRODUCTION.rxsoftBaseUrl,
     /** Stable conversation-engine channel code (NOT a DB id). */
     val webChannelCode: String = AppConfigStore.DEFAULT_WEB_CHANNEL_CODE,
     /**
@@ -41,7 +45,7 @@ data class AppConfig(
      */
     val queryRange: QueryRangePeriod = QueryRangePeriod.NONE,
     /** Server environment preset used to fill base URLs. */
-    val serverEnvironment: ServerEnvironment = ServerEnvironment.DEVELOPMENT,
+    val serverEnvironment: ServerEnvironment = ServerEnvironment.PRODUCTION,
 )
 
 @Serializable
@@ -71,9 +75,27 @@ enum class ServerEnvironment(val id: String, val label: String) {
             DEVELOPMENT -> AppConfigStore.DEFAULT_CONVERSATION_URL
         }
 
+    /**
+     * Coding concepts gateway (LOINC/DICOM suggestions + generic products/drugs).
+     * Production: `https://api.ehealthwares.com/concepts/v1/` (nginx routes
+     * `/concepts/` → concepts service `/api/`, so this resolves to `/api/v1/`).
+     */
+    val conceptsBaseUrl: String
+        get() = when (this) {
+            PRODUCTION -> "https://api.ehealthwares.com/concepts/v1/"
+            DEVELOPMENT -> AppConfigStore.DEFAULT_CONCEPTS_URL
+        }
+
+    /** rxsoft core gateway (inventory `/items`). Production → internal `/api/`. */
+    val rxsoftBaseUrl: String
+        get() = when (this) {
+            PRODUCTION -> "https://api.ehealthwares.com/"
+            DEVELOPMENT -> AppConfigStore.DEFAULT_RXSOFT_URL
+        }
+
     companion object {
         fun fromId(id: String?): ServerEnvironment =
-            entries.firstOrNull { it.id == id } ?: DEVELOPMENT
+            entries.firstOrNull { it.id == id } ?: PRODUCTION
     }
 }
 
@@ -157,6 +179,18 @@ fun AppConfig.withConversationBaseUrl(raw: String): AppConfig {
     return copy(conversationBaseUrl = withSlash)
 }
 
+fun AppConfig.withConceptsBaseUrl(raw: String): AppConfig {
+    val normalized = raw.trim().trimEnd('/').ifEmpty { conceptsBaseUrl.trimEnd('/') }
+    val withSlash = if (normalized.endsWith("/")) normalized else "$normalized/"
+    return copy(conceptsBaseUrl = withSlash)
+}
+
+fun AppConfig.withRxsoftBaseUrl(raw: String): AppConfig {
+    val normalized = raw.trim().trimEnd('/').ifEmpty { rxsoftBaseUrl.trimEnd('/') }
+    val withSlash = if (normalized.endsWith("/")) normalized else "$normalized/"
+    return copy(rxsoftBaseUrl = withSlash)
+}
+
 fun AppConfig.withWebChannelCode(raw: String): AppConfig {
     val normalized = raw.trim().ifEmpty { webChannelCode }
     return copy(webChannelCode = normalized)
@@ -172,4 +206,6 @@ fun AppConfig.withServerEnvironment(env: ServerEnvironment): AppConfig =
         serverEnvironment = env,
         emrBaseUrl = env.emrBaseUrl,
         conversationBaseUrl = env.conversationBaseUrl,
+        conceptsBaseUrl = env.conceptsBaseUrl,
+        rxsoftBaseUrl = env.rxsoftBaseUrl,
     )

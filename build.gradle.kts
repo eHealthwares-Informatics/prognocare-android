@@ -6,4 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt.android) apply false
+
+    // Declared here, applied in the :app module (see app/build.gradle.kts, sentry {}).
+    alias(libs.plugins.sentry.android) apply false
 }

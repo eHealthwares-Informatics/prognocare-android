@@ -21,11 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -42,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,6 +87,23 @@ private fun priorityType(priority: String?): StatusType? = when (priority?.upper
     else -> null
 }
 
+/** `yyyy-MM-dd` → epoch millis at UTC midnight (DatePicker's convention). */
+private fun String?.toEpochMillisOrNull(): Long? = this?.let { date ->
+    runCatching {
+        java.time.LocalDate.parse(date)
+            .atStartOfDay(java.time.ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
+}
+
+/** DatePicker epoch millis → `yyyy-MM-dd`. */
+private fun Long.toDateString(): String =
+    java.time.Instant.ofEpochMilli(this)
+        .atZone(java.time.ZoneOffset.UTC)
+        .toLocalDate()
+        .toString()
+
 /** Title row with the location-scope chip used by all three list screens. */
 @Composable
 private fun ScopeBar(
@@ -117,6 +138,7 @@ fun ClinicalAppointmentsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.load()
@@ -161,9 +183,55 @@ fun ClinicalAppointmentsScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Location scope ("location based query")
-            Row(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-                ScopeBar(viewModel) { viewModel.load() }
+            // Location scope ("location based query") + date filter
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(modifier = Modifier.weight(1f)) { ScopeBar(viewModel) { viewModel.load() } }
+                FilterChip(
+                    selected = state.dateFilter != null,
+                    onClick = { showDatePicker = true },
+                    label = { Text(state.dateFilter ?: "All dates") },
+                    leadingIcon = {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Pick date")
+                    },
+                )
+            }
+
+            if (showDatePicker) {
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = state.dateFilter.toEpochMillisOrNull(),
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                datePickerState.selectedDateMillis?.let { millis ->
+                                    viewModel.setDate(millis.toDateString())
+                                }
+                                showDatePicker = false
+                            },
+                        ) { Text("OK") }
+                    },
+                    dismissButton = {
+                        Row {
+                            TextButton(
+                                onClick = {
+                                    viewModel.setDate(null)
+                                    showDatePicker = false
+                                },
+                            ) { Text("Clear") }
+                            TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                        }
+                    },
+                ) {
+                    DatePicker(state = datePickerState)
+                }
             }
 
             // Status filters

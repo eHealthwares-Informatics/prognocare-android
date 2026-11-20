@@ -30,12 +30,16 @@ sealed class FormUiState {
     ) : FormUiState()
     data object Empty : FormUiState()
     data class Submitted(val submission: FormSubmission) : FormUiState()
+    /** Saved on device; will be submitted when connectivity returns. */
+    data object SubmittedOffline : FormUiState()
     data class Error(val message: String) : FormUiState()
 }
 
 @HiltViewModel
 class FormViewModel @Inject constructor(
     private val retrofitClient: RetrofitClient,
+    private val offlineStore: com.ehealthwares.prognocare.data.local.OfflineStore,
+    private val connectivity: com.ehealthwares.prognocare.data.network.ConnectivityObserver,
 ) : ViewModel() {
 
     private val _available = MutableStateFlow<List<FormDefinition>>(emptyList())
@@ -149,23 +153,26 @@ class FormViewModel @Inject constructor(
         _state.value = s.copy(errors = emptyList(), submitting = true)
 
         viewModelScope.launch {
+            // Resolve the value bag onto the schema's real field keys via
+            // SchemaKeyMapper.remap — exact keys win, then normalized and
+            // concept-alias matches; unknown and null entries are dropped.
+            val jsonElements = s.data.mapValues { (_, value) -> toJsonElement(value) }
+            val payload = SchemaKeyMapper.remap(s.formDefinition.schemaJson, jsonElements)
+            val dto = CreateFormSubmissionDto(
+                formDefinitionId = s.formDefinition.id,
+                patientId = patientId,
+                visitId = visitId,
+                encounterId = encounterId,
+                dataJson = payload,
+                status = "SUBMITTED",
+            )
             try {
+                if (!connectivity.online) {
+                    queueOffline(dto)
+                    return@launch
+                }
                 val api = retrofitClient.apis.value.formApi
-                // Resolve the value bag onto the schema's real field keys via
-                // SchemaKeyMapper.remap — exact keys win, then normalized and
-                // concept-alias matches; unknown and null entries are dropped.
-                val jsonElements = s.data.mapValues { (_, value) -> toJsonElement(value) }
-                val payload = SchemaKeyMapper.remap(s.formDefinition.schemaJson, jsonElements)
-                val resp = api.createSubmission(
-                    CreateFormSubmissionDto(
-                        formDefinitionId = s.formDefinition.id,
-                        patientId = patientId,
-                        visitId = visitId,
-                        encounterId = encounterId,
-                        dataJson = payload,
-                        status = "SUBMITTED",
-                    ),
-                )
+                val resp = api.createSubmission(dto)
                 if (resp.isSuccessful && resp.body() != null) {
                     _state.value = FormUiState.Submitted(resp.body()!!)
                 } else {
@@ -178,10 +185,22 @@ class FormViewModel @Inject constructor(
                         errors = listOf(detail ?: "Submit failed (${resp.code()})"),
                     )
                 }
+            } catch (e: java.io.IOException) {
+                queueOffline(dto)
             } catch (e: Exception) {
                 _state.value = s.copy(submitting = false, errors = listOf("Network error: ${e.message}"))
             }
         }
+    }
+
+    /** Stores the submission on device and queues it for sync. */
+    private suspend fun queueOffline(dto: CreateFormSubmissionDto) {
+        offlineStore.enqueue(
+            type = com.ehealthwares.prognocare.data.local.PendingActionType.DOCUMENT,
+            payload = json.encodeToString(CreateFormSubmissionDto.serializer(), dto),
+            localRef = dto.patientId.takeIf { it.startsWith("local-") },
+        )
+        _state.value = FormUiState.SubmittedOffline
     }
 
     private fun buildInitial(schema: FormSchemaData): FormData {

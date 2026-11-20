@@ -1,5 +1,7 @@
 package com.ehealthwares.prognocare.feature.records
 
+import com.ehealthwares.prognocare.data.local.OfflineStore
+import com.ehealthwares.prognocare.data.network.ConnectivityObserver
 import com.ehealthwares.prognocare.data.remote.RetrofitClient
 import com.ehealthwares.prognocare.data.remote.models.AdministerMedicationDto
 import com.ehealthwares.prognocare.data.remote.models.AddRequestNoteDto
@@ -35,6 +37,8 @@ import javax.inject.Singleton
 @Singleton
 class EmrRepository @Inject constructor(
     private val retrofitClient: RetrofitClient,
+    private val offlineStore: OfflineStore,
+    private val connectivity: ConnectivityObserver,
 ) {
 
     // ── Dashboard ────────────────────────────────────────────────
@@ -261,10 +265,20 @@ class EmrRepository @Inject constructor(
     // ── Patients (pass-through helpers) ──────────────────────────
 
     suspend fun patients(search: String? = null, limit: Int = 50) =
-        retrofitClient.apis.first().patientApi.let { api ->
-            val response = api.list(page = 1, limit = limit, search = search?.takeIf { it.isNotBlank() })
-            if (!response.isSuccessful) throw failure(response)
-            response.body() ?: PaginatedResponse(emptyList())
+        try {
+            retrofitClient.apis.first().patientApi.let { api ->
+                val response = api.list(page = 1, limit = limit, search = search?.takeIf { it.isNotBlank() })
+                if (!response.isSuccessful) throw failure(response)
+                val page = response.body() ?: PaginatedResponse(emptyList())
+                offlineStore.cachePatients(page.data)
+                page
+            }
+        } catch (e: Exception) {
+            if (!connectivity.online) {
+                PaginatedResponse(offlineStore.searchPatients(search.orEmpty(), limit))
+            } else {
+                throw e
+            }
         }
 
     private fun failure(response: retrofit2.Response<*>): ApiException {

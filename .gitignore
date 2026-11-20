@@ -17,3 +17,6 @@
 ehealthwares-release-keystore.jks
 
 local.properties
+
+# Sentry Config File
+sentry.properties

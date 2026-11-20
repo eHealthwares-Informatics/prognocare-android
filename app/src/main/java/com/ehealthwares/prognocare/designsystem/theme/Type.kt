@@ -6,108 +6,109 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Using system default (Roboto) for clean medical-grade readability
-// Replace with bundled Figtree/Noto Sans for brand-consistent typography
+// Using system default (Roboto) for clean medical-grade readability.
+// The scale is intentionally compact (≈10–18% below the Material defaults) so
+// dense clinical lists, dashboards and forms fit more on screen.
 private val DefaultFontFamily = FontFamily.Default
 
 val PrognoCareTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
+        fontSize = 46.sp,
+        lineHeight = 52.sp,
         letterSpacing = (-0.25).sp,
     ),
     displayMedium = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 45.sp,
-        lineHeight = 52.sp,
+        fontSize = 36.sp,
+        lineHeight = 42.sp,
     ),
     displaySmall = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
+        fontSize = 30.sp,
+        lineHeight = 36.sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
+        fontSize = 26.sp,
+        lineHeight = 32.sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
     ),
     headlineSmall = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 32.sp,
+        fontSize = 19.sp,
+        lineHeight = 24.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
+        fontSize = 17.sp,
+        lineHeight = 22.sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = DefaultFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.15.sp,
-    ),
-    titleSmall = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp,
     ),
-    bodyLarge = TextStyle(
+    titleSmall = TextStyle(
         fontFamily = DefaultFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.1.sp,
     ),
-    bodyMedium = TextStyle(
+    bodyLarge = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp,
     ),
+    bodyMedium = TextStyle(
+        fontFamily = DefaultFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.2.sp,
+    ),
     bodySmall = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.4.sp,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 0.3.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
         letterSpacing = 0.1.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 0.4.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.4.sp,
     ),
 )

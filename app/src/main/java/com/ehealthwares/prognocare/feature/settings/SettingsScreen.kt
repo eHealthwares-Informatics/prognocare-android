@@ -26,12 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ehealthwares.prognocare.designsystem.theme.Spacing
+import io.sentry.Sentry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
+    offlineViewModel: OfflineStatusViewModel = hiltViewModel(),
 ) {
     val config by viewModel.config.collectAsState()
     val isVerifying by viewModel.isVerifying.collectAsState()
@@ -39,6 +41,10 @@ fun SettingsScreen(
     val dateRangeSaving by viewModel.dateRangeSaving.collectAsState()
     val dateRangeMessage by viewModel.dateRangeMessage.collectAsState()
     val discovery by viewModel.discovery.collectAsState()
+    val pendingCount by offlineViewModel.pendingCount.collectAsState()
+    val cachedPatients by offlineViewModel.cachedPatients.collectAsState()
+    val isOnline by offlineViewModel.isOnline.collectAsState()
+    val isSyncing by offlineViewModel.isSyncing.collectAsState()
 
     Scaffold(
         topBar = {
@@ -76,8 +82,8 @@ fun SettingsScreen(
         ) {
             ServerConfigContent(
                 config = config,
-                onSave = { emr, conv, channel, env ->
-                    viewModel.saveConfig(emr, conv, channel, env)
+                onSave = { emr, conv, concepts, rxsoft, channel, env ->
+                    viewModel.saveConfig(emr, conv, concepts, rxsoft, channel, env)
                 },
                 onReset = { viewModel.resetToDefaults() },
                 isVerifying = isVerifying,
@@ -93,6 +99,22 @@ fun SettingsScreen(
                 onSave = { period -> viewModel.saveQueryRange(period) },
                 isSaving = dateRangeSaving,
                 saveMessage = dateRangeMessage,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            DiagnosticsContent(
+                onSendTestEvent = {
+                    Sentry.captureException(
+                        Exception(
+                            "Sentry test event from Settings at ${System.currentTimeMillis()}",
+                        ),
+                    )
+                },
+                pendingCount = pendingCount,
+                cachedPatientCount = cachedPatients,
+                isOnline = isOnline,
+                isSyncing = isSyncing,
+                onSync = offlineViewModel::syncNow,
                 modifier = Modifier.fillMaxWidth(),
             )
 

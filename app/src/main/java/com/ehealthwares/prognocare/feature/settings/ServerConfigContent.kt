@@ -55,6 +55,8 @@ fun ServerConfigContent(
     onSave: (
         emrBaseUrl: String,
         conversationBaseUrl: String,
+        conceptsBaseUrl: String,
+        rxsoftBaseUrl: String,
         webChannelCode: String,
         environment: ServerEnvironment,
     ) -> Unit,
@@ -69,6 +71,8 @@ fun ServerConfigContent(
     var environment by rememberSaveable { mutableStateOf(config.serverEnvironment) }
     var emrUrl by rememberSaveable { mutableStateOf(config.emrBaseUrl) }
     var conversationUrl by rememberSaveable { mutableStateOf(config.conversationBaseUrl) }
+    var conceptsUrl by rememberSaveable { mutableStateOf(config.conceptsBaseUrl) }
+    var rxsoftUrl by rememberSaveable { mutableStateOf(config.rxsoftBaseUrl) }
     var channelCode by rememberSaveable { mutableStateOf(config.webChannelCode) }
 
     Card(
@@ -105,6 +109,8 @@ fun ServerConfigContent(
                             environment = env
                             emrUrl = env.emrBaseUrl
                             conversationUrl = env.conversationBaseUrl
+                            conceptsUrl = env.conceptsBaseUrl
+                            rxsoftUrl = env.rxsoftBaseUrl
                         },
                         label = { Text(env.label) },
                         modifier = Modifier.weight(1f),
@@ -197,6 +203,32 @@ fun ServerConfigContent(
             )
 
             OutlinedTextField(
+                value = conceptsUrl,
+                onValueChange = { conceptsUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Concepts base URL (LOINC/DICOM)") },
+                singleLine = true,
+                shape = RoundedCornerShape(Spacing.md),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
+
+            OutlinedTextField(
+                value = rxsoftUrl,
+                onValueChange = { rxsoftUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("rxsoft base URL (stock items)") },
+                singleLine = true,
+                shape = RoundedCornerShape(Spacing.md),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
+
+            OutlinedTextField(
                 value = channelCode,
                 onValueChange = { channelCode = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -214,7 +246,7 @@ fun ServerConfigContent(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Button(
-                    onClick = { onSave(emrUrl, conversationUrl, channelCode, environment) },
+                    onClick = { onSave(emrUrl, conversationUrl, conceptsUrl, rxsoftUrl, channelCode, environment) },
                     modifier = Modifier.weight(1f),
                     enabled = !isVerifying,
                     shape = RoundedCornerShape(Spacing.md),

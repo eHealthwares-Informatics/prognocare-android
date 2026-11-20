@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val themeSettings by themeViewModel.themeSettings.collectAsState()
             val isSystemDark = isSystemInDarkTheme()
-            
+
             PrognoCareTheme(
                 themeSettings = themeSettings,
                 isSystemDark = isSystemDark

@@ -75,13 +75,19 @@ data class RegisterPatientState(
 )
 
 sealed class RegisterPatientEvent {
-    data class Success(val patientId: String, val name: String) : RegisterPatientEvent()
+    data class Success(
+        val patientId: String,
+        val name: String,
+        val offline: Boolean = false,
+    ) : RegisterPatientEvent()
     data class Error(val message: String) : RegisterPatientEvent()
 }
 
 @HiltViewModel
 class RegisterPatientViewModel @Inject constructor(
     private val retrofitClient: RetrofitClient,
+    private val offlineStore: com.ehealthwares.prognocare.data.local.OfflineStore,
+    private val connectivity: com.ehealthwares.prognocare.data.network.ConnectivityObserver,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RegisterPatientState())
@@ -101,26 +107,30 @@ class RegisterPatientViewModel @Inject constructor(
             return
         }
         if (current.isSaving) return
+        val dto = CreatePatientDto(
+            firstName = current.firstName.trim(),
+            lastName = current.lastName.trim(),
+            otherNames = current.otherNames.trim().takeIf { it.isNotEmpty() },
+            dateOfBirth = current.dateOfBirth.trim().takeIf { it.isNotEmpty() },
+            gender = current.gender.takeIf { it.isNotEmpty() },
+            phone = current.phone.trim().takeIf { it.isNotEmpty() },
+            email = current.email.trim().takeIf { it.isNotEmpty() },
+            address = current.address.trim().takeIf { it.isNotEmpty() },
+            nextOfKinName = current.nextOfKinName.trim().takeIf { it.isNotEmpty() },
+            nextOfKinPhone = current.nextOfKinPhone.trim().takeIf { it.isNotEmpty() },
+            nextOfKinRelationship = current.nextOfKinRelationship.trim().takeIf { it.isNotEmpty() },
+        )
         viewModelScope.launch {
             _state.value = current.copy(isSaving = true, error = null)
             try {
-                val resp = retrofitClient.apis.value.patientApi.create(
-                    CreatePatientDto(
-                        firstName = current.firstName.trim(),
-                        lastName = current.lastName.trim(),
-                        otherNames = current.otherNames.trim().takeIf { it.isNotEmpty() },
-                        dateOfBirth = current.dateOfBirth.trim().takeIf { it.isNotEmpty() },
-                        gender = current.gender.takeIf { it.isNotEmpty() },
-                        phone = current.phone.trim().takeIf { it.isNotEmpty() },
-                        email = current.email.trim().takeIf { it.isNotEmpty() },
-                        address = current.address.trim().takeIf { it.isNotEmpty() },
-                        nextOfKinName = current.nextOfKinName.trim().takeIf { it.isNotEmpty() },
-                        nextOfKinPhone = current.nextOfKinPhone.trim().takeIf { it.isNotEmpty() },
-                        nextOfKinRelationship = current.nextOfKinRelationship.trim().takeIf { it.isNotEmpty() },
-                    ),
-                )
+                if (!connectivity.online) {
+                    saveOffline(dto)
+                    return@launch
+                }
+                val resp = retrofitClient.apis.value.patientApi.create(dto)
                 if (resp.isSuccessful && resp.body() != null) {
                     val patient = resp.body()!!
+                    offlineStore.cachePatient(patient)
                     _events.emit(
                         RegisterPatientEvent.Success(
                             patientId = patient.patientId.ifBlank { patient.id },
@@ -133,11 +143,40 @@ class RegisterPatientViewModel @Inject constructor(
                         .getOrNull()?.lineSequence()?.firstOrNull()?.take(200)
                     _events.emit(RegisterPatientEvent.Error(detail ?: "Registration failed (${resp.code()})"))
                 }
+            } catch (e: java.io.IOException) {
+                // Lost connectivity mid-request — keep the registration.
+                saveOffline(dto)
             } catch (e: Exception) {
                 _events.emit(RegisterPatientEvent.Error(e.message ?: "Registration failed"))
             } finally {
                 _state.value = _state.value.copy(isSaving = false)
             }
+        }
+    }
+
+    /** Stores the patient on device and queues it for sync. */
+    private suspend fun saveOffline(dto: CreatePatientDto) {
+        val patient = offlineStore.saveLocalPatient(dto)
+        offlineStore.enqueue(
+            type = com.ehealthwares.prognocare.data.local.PendingActionType.PATIENT,
+            payload = syncJson.encodeToString(CreatePatientDto.serializer(), dto),
+            localRef = patient.id,
+        )
+        _events.emit(
+            RegisterPatientEvent.Success(
+                patientId = patient.patientId,
+                name = patient.displayName,
+                offline = true,
+            ),
+        )
+        _state.value = RegisterPatientState()
+    }
+
+    private companion object {
+        val syncJson = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+            explicitNulls = false
         }
     }
 }
@@ -158,7 +197,12 @@ fun RegisterPatientScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is RegisterPatientEvent.Success -> {
-                    snackbarHostState.showSnackbar("Patient ${event.name} registered (${event.patientId})")
+                    val message = if (event.offline) {
+                        "Saved offline: ${event.name} (${event.patientId}) will sync when online"
+                    } else {
+                        "Patient ${event.name} registered (${event.patientId})"
+                    }
+                    snackbarHostState.showSnackbar(message)
                     onRegistered(event.patientId)
                 }
                 is RegisterPatientEvent.Error -> snackbarHostState.showSnackbar(event.message)

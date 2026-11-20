@@ -121,4 +121,64 @@ class FormSchemaParserTest {
         assertEquals(FormFieldType.TEXT, field.type)
         assertEquals(emptyList<String>(), field.options)
     }
+
+    @Test
+    fun `parses annotate config`() {
+        val schema = json.parseToJsonElement(
+            """
+            {
+              "fields": [
+                { "key": "regions", "label": "Regions", "type": "annotate",
+                  "annotate": { "target": "body", "multiple": true, "regions": ["head", "neck"] } },
+                { "key": "organ", "label": "Heart", "type": "annotate",
+                  "annotate": { "target": "organ", "organ": "heart", "structures": ["left-ventricle"] } },
+                { "key": "level", "label": "Level", "type": "annotate",
+                  "annotate": { "target": "dermatome", "multiple": false } }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val parsed = FormSchemaParser.parse(schema)
+
+        assertEquals(FormFieldType.ANNOTATE, parsed.fields[0].type)
+        assertEquals(com.ehealthwares.prognocare.feature.forms.AnnotateTarget.BODY, parsed.fields[0].annotate?.target)
+        assertEquals(listOf("head", "neck"), parsed.fields[0].annotate?.regions)
+
+        assertEquals(com.ehealthwares.prognocare.feature.forms.AnnotateTarget.ORGAN, parsed.fields[1].annotate?.target)
+        assertEquals("heart", parsed.fields[1].annotate?.organ)
+        assertEquals(listOf("left-ventricle"), parsed.fields[1].annotate?.structures)
+
+        assertEquals(com.ehealthwares.prognocare.feature.forms.AnnotateTarget.DERMATOME, parsed.fields[2].annotate?.target)
+        assertEquals(false, parsed.fields[2].annotate?.multiple)
+    }
+
+    @Test
+    fun `parses file and lookup field types`() {
+        val schema = json.parseToJsonElement(
+            """
+            {
+              "fields": [
+                { "key": "doc", "label": "Doc", "type": "file", "accept": "application/pdf", "multiple": true, "maxSizeMb": 5 },
+                { "key": "who", "label": "Who", "type": "patient" },
+                { "key": "by", "label": "By", "type": "practitioner" },
+                { "key": "dept", "label": "Dept", "type": "department" },
+                { "key": "code", "label": "Code", "type": "loinc-test" }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val parsed = FormSchemaParser.parse(schema)
+
+        assertEquals(FormFieldType.FILE, parsed.fields[0].type)
+        assertEquals("application/pdf", parsed.fields[0].accept)
+        assertTrue(parsed.fields[0].multiple)
+        assertEquals(5, parsed.fields[0].maxSizeMb)
+
+        assertEquals(FormFieldType.PATIENT, parsed.fields[1].type)
+        assertEquals(FormFieldType.PRACTITIONER, parsed.fields[2].type)
+        assertEquals(FormFieldType.DEPARTMENT, parsed.fields[3].type)
+        assertEquals(FormFieldType.LOINC_TEST, parsed.fields[4].type)
+    }
 }

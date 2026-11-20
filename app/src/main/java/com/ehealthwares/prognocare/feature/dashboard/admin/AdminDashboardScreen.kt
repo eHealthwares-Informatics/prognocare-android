@@ -202,11 +202,11 @@ fun AdminDashboardScreen(
                         )
                         DashboardKpiCard(
                             title = "Checked In",
-                            value = "${state.checkedInToday}",
+                            value = "${state.checkedInToday}/${state.totalAppointments}",
                             icon = Icons.Outlined.EventAvailable,
                             iconTint = AppThemeColors.current.kpiGreen,
                             iconBg = AppThemeColors.current.kpiGreenLight,
-                            onClick = onNavigateToCheckIn,
+                            onClick = onNavigateToAppointments,
                             modifier = Modifier.weight(1f),
                         )
                     }

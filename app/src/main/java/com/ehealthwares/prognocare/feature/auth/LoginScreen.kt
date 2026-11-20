@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material3.Button
@@ -33,10 +33,15 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -50,8 +55,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.annotation.DrawableRes
 import android.app.Activity
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
@@ -80,10 +87,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ehealthwares.prognocare.R
+import com.ehealthwares.prognocare.data.config.AppConfig
+import com.ehealthwares.prognocare.data.config.ServerEnvironment
 import com.ehealthwares.prognocare.designsystem.theme.AppThemeColors
 import com.ehealthwares.prognocare.designsystem.theme.Primary
 import com.ehealthwares.prognocare.designsystem.theme.PrimaryDark
 import com.ehealthwares.prognocare.designsystem.theme.Spacing
+import com.ehealthwares.prognocare.feature.settings.DiscoveryState
+import com.ehealthwares.prognocare.feature.settings.SaveResult
 import com.ehealthwares.prognocare.feature.settings.ServerConfigContent
 import com.ehealthwares.prognocare.feature.settings.SettingsViewModel
 import com.ehealthwares.prognocare.feature.settings.TapCounter
@@ -101,6 +112,7 @@ fun LoginScreen(
     val isLoading by loginViewModel.state.collectAsState()
     var selectedRole by remember { mutableStateOf(UserRole.Doctor) }
     var configRevealed by remember { mutableStateOf(false) }
+    var showConfigSheet by remember { mutableStateOf(false) }
     var tapProgress by remember { mutableStateOf(0) }
     val tapCounter = remember { TapCounter() }
     val config by settingsViewModel.config.collectAsState()
@@ -130,14 +142,13 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .imePadding(),
     ) {
         // ── Header / Branding ───────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .height(240.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
@@ -150,6 +161,7 @@ fun LoginScreen(
                     tapCounter.onTap()
                     tapProgress = tapCounter.count
                     configRevealed = tapCounter.revealed
+                    if (tapCounter.revealed) showConfigSheet = true
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -211,23 +223,9 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.xl),
+                .padding(horizontal = Spacing.xl, vertical = Spacing.base),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "Welcome back",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            Text(
-                text = "Sign in to your account",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(Spacing.xl))
-
             // Email
             OutlinedTextField(
                 value = email,
@@ -316,7 +314,7 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Spacer(modifier = Modifier.height(Spacing.lg))
+            Spacer(modifier = Modifier.height(Spacing.md))
 
             // ── Role Selector (Demo) ────────────────────────
             Row(
@@ -330,87 +328,19 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "8 roles available",
+                    text = "${UserRole.entries.size} roles available",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-            Spacer(modifier = Modifier.height(Spacing.sm))
+            Spacer(modifier = Modifier.height(Spacing.xs))
 
-            // Role grid - 2 rows of 4
-            val roles = UserRole.entries.chunked(4)
-            roles.forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    row.forEach { role ->
-                        val isSelected = selectedRole == role
-                        val (bgColor, iconColor) = when (role) {
-                            UserRole.Doctor -> AppThemeColors.current.kpiBlueLight to AppThemeColors.current.kpiBlue
-                            UserRole.Nurse -> AppThemeColors.current.kpiGreenLight to AppThemeColors.current.kpiGreen
-                            UserRole.Patient -> AppThemeColors.current.kpiPurpleLight to AppThemeColors.current.kpiPurple
-                            UserRole.Specialist -> AppThemeColors.current.kpiOrangeLight to AppThemeColors.current.kpiOrange
-                            UserRole.Therapist -> Color(0xFFFCE7F3) to Color(0xFFEC4899)
-                            UserRole.Technician -> Color(0xFFE0E7FF) to Color(0xFF6366F1)
-                            UserRole.Finance -> Color(0xFFFEF3C7) to Color(0xFFD97706)
-                            UserRole.Support -> Color(0xFFFFF7ED) to Color(0xFFF97316)
-                            UserRole.Admin -> Color(0xFFFEE2E2) to Color(0xFFDC2626)
-                        }
+            RoleDropdown(
+                selectedRole = selectedRole,
+                onRoleSelected = { selectedRole = it },
+            )
 
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(Spacing.sm))
-                                .clickable { selectedRole = role },
-                            shape = RoundedCornerShape(Spacing.sm),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) bgColor else MaterialTheme.colorScheme.surfaceVariant,
-                            ),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = if (isSelected) 2.dp else 0.dp,
-                            ),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isSelected) iconColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outlineVariant),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = role.displayName.take(1),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (isSelected) iconColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                Text(
-                                    text = role.displayName,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) iconColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                )
-                            }
-                        }
-                    }
-                    // Fill remaining space in the last row
-                    repeat(4 - row.size) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-                Spacer(modifier = Modifier.height(Spacing.sm))
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.xl))
+            Spacer(modifier = Modifier.height(Spacing.lg))
 
             // ── Login Button ─────────────────────────────────
             Button(
@@ -452,7 +382,7 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(Spacing.xl))
+            Spacer(modifier = Modifier.height(Spacing.lg))
 
             // ── Sign up link ─────────────────────────────────
             Row(
@@ -502,6 +432,7 @@ fun LoginScreen(
             ) {
                 SocialLoginButton(
                     text = "Google",
+                    iconRes = R.drawable.ic_google,
                     enabled = !socialBusy,
                     onClick = {
                         if (socialBusy) return@SocialLoginButton
@@ -559,17 +490,8 @@ fun LoginScreen(
                     modifier = Modifier.weight(1f),
                 )
                 SocialLoginButton(
-                    text = "Apple",
-                    onClick = { /* TODO: Apple login (out of scope) */ },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.md))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SocialLoginButton(
                     text = "Facebook",
+                    iconRes = R.drawable.ic_facebook,
                     enabled = !socialBusy,
                     onClick = {
                         if (socialBusy) return@SocialLoginButton
@@ -600,65 +522,23 @@ fun LoginScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
-
-            Spacer(modifier = Modifier.height(Spacing.xxl))
-
-            AnimatedVisibility(visible = configRevealed, enter = fadeIn(), exit = fadeOut()) {
-                Column {
-                    // Current server URLs (read-only) above the editable fields
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(Spacing.md),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.md),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            Text(
-                                text = "Current server URLs",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = "EMR: ${config.emrBaseUrl}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = "Chat: ${config.conversationBaseUrl}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = "Channel: ${config.webChannelCode}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(Spacing.md))
-                    ServerConfigContent(
-                        config = config,
-                        onSave = { emr, conv, channel, env ->
-                            settingsViewModel.saveConfig(emr, conv, channel, env)
-                        },
-                        onReset = { settingsViewModel.resetToDefaults() },
-                        isVerifying = isVerifying,
-                        saveResult = saveResult,
-                        discovery = discovery,
-                        onDiscover = settingsViewModel::discoverServers,
-                        onDismissDiscovery = settingsViewModel::dismissDiscovery,
-                    )
-                }
-            }
         }
+    }
+
+    if (showConfigSheet) {
+        ServerConfigSheet(
+            config = config,
+            isVerifying = isVerifying,
+            saveResult = saveResult,
+            discovery = discovery,
+            onSave = { emr, conv, concepts, rxsoft, channel, env ->
+                settingsViewModel.saveConfig(emr, conv, concepts, rxsoft, channel, env)
+            },
+            onReset = { settingsViewModel.resetToDefaults() },
+            onDiscover = settingsViewModel::discoverServers,
+            onDismissDiscovery = settingsViewModel::dismissDiscovery,
+            onDismiss = { showConfigSheet = false },
+        )
     }
 }
 
@@ -688,6 +568,7 @@ private fun SocialLoginButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    @DrawableRes iconRes: Int? = null,
 ) {
     Card(
         modifier = modifier
@@ -697,10 +578,23 @@ private fun SocialLoginButton(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = Spacing.md),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (iconRes != null) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .alpha(if (enabled) 1f else 0.5f),
+                )
+                Spacer(modifier = Modifier.width(Spacing.sm))
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
@@ -708,6 +602,162 @@ private fun SocialLoginButton(
                     .copy(alpha = if (enabled) 1f else 0.5f),
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RoleDropdown(
+    selectedRole: UserRole,
+    onRoleSelected: (UserRole) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = selectedRole.displayName,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Role") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Badge,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            shape = RoundedCornerShape(Spacing.md),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            UserRole.entries.forEach { role ->
+                DropdownMenuItem(
+                    text = { Text(role.displayName) },
+                    onClick = {
+                        onRoleSelected(role)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Easter-egg server-config panel. Shown as a modal bottom sheet so the hidden
+ * 10-tap unlock always appears over the login screen regardless of how much
+ * vertical space the form uses.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ServerConfigSheet(
+    config: AppConfig,
+    isVerifying: Boolean,
+    saveResult: SaveResult?,
+    discovery: DiscoveryState,
+    onSave: (String, String, String, String, String, ServerEnvironment) -> Unit,
+    onReset: () -> Unit,
+    onDiscover: () -> Unit,
+    onDismissDiscovery: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.xl)
+                .padding(bottom = Spacing.xl),
+        ) {
+            Text(
+                text = "Server configuration",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            // Current server URLs (read-only) above the editable fields
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Spacing.md),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Text(
+                        text = "Current server URLs",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "EMR: ${config.emrBaseUrl}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Chat: ${config.conversationBaseUrl}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Concepts: ${config.conceptsBaseUrl}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "rxsoft: ${config.rxsoftBaseUrl}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Channel: ${config.webChannelCode}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            ServerConfigContent(
+                config = config,
+                onSave = onSave,
+                onReset = onReset,
+                isVerifying = isVerifying,
+                saveResult = saveResult,
+                discovery = discovery,
+                onDiscover = onDiscover,
+                onDismissDiscovery = onDismissDiscovery,
             )
         }
     }

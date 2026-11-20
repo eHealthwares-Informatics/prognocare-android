@@ -17,11 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -34,12 +41,17 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +64,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ehealthwares.prognocare.designsystem.theme.Spacing
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 private fun String.titleCase(): String =
     replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
@@ -66,6 +81,7 @@ fun DynamicFormScreen(
     onBack: () -> Unit,
     onComplete: (() -> Unit)? = null,
     viewModel: FormViewModel = hiltViewModel(),
+    lookupViewModel: FormLookupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -101,9 +117,14 @@ fun DynamicFormScreen(
                 s.submission.submissionNumber,
                 onBack,
             )
+            is FormUiState.SubmittedOffline -> OfflineSubmittedBox(
+                innerPadding.calculateTopPadding(),
+                onBack,
+            )
             is FormUiState.Ready -> FormContent(
                 topPadding = innerPadding.calculateTopPadding(),
                 s = s,
+                lookup = lookupViewModel.repository,
                 onDraft = { viewModel.submit(patientId, visitId, encounterId) },
                 onValueChange = viewModel::updateField,
                 onAddRow = viewModel::addTableRow,
@@ -118,6 +139,7 @@ fun DynamicFormScreen(
 private fun FormContent(
     topPadding: Dp,
     s: FormUiState.Ready,
+    lookup: FormLookupRepository,
     onDraft: () -> Unit,
     onValueChange: (String, Any?) -> Unit,
     onAddRow: (FormField) -> Unit,
@@ -144,6 +166,7 @@ private fun FormContent(
             fields = s.schema.fields,
             data = s.data,
             enabled = !s.submitting,
+            lookup = lookup,
             onValueChange = onValueChange,
             onAddRow = onAddRow,
             onRemoveRow = onRemoveRow,
@@ -173,19 +196,36 @@ private fun FieldList(
     fields: List<FormField>,
     data: FormData,
     enabled: Boolean,
+    lookup: FormLookupRepository,
     onValueChange: (String, Any?) -> Unit,
     onAddRow: (FormField) -> Unit,
     onRemoveRow: (FormField, Int) -> Unit,
     onRowValue: (FormField, Int, String, Any?) -> Unit,
 ) {
     // Column arrangement: consecutive simple fields (text/number/select/etc.)
-    // are chunked into two-per-row rows; structural fields (sections, tabs,
-    // columns, tables, textareas) always get the full width.
+    // are chunked into two-per-row rows; structural and lookup fields always
+    // get the full width.
+    val fullWidthTypes = setOf(
+        FormFieldType.TABLE, FormFieldType.TEXTAREA, FormFieldType.ANNOTATE,
+        FormFieldType.PATIENT, FormFieldType.AUTH_PATIENT, FormFieldType.PRACTITIONER,
+        FormFieldType.DEPARTMENT, FormFieldType.FILE,
+        FormFieldType.ITEM, FormFieldType.INVENTORY_ITEM,
+        FormFieldType.GENERIC_PRODUCT, FormFieldType.GENERIC_DRUG,
+        FormFieldType.LOINC_TEST, FormFieldType.DICOM_TEST,
+    )
+    val hiddenTypes = setOf(
+        FormFieldType.QR_CODE, FormFieldType.PRINT, FormFieldType.SEND_FORM,
+    )
+
     var index = 0
     while (index < fields.size) {
         val field = fields[index]
-        when (field.type) {
-            FormFieldType.SECTION -> {
+        when {
+            field.type in hiddenTypes -> {
+                // Action widgets with no mobile equivalent (print / send / QR).
+                index += 1
+            }
+            field.type == FormFieldType.SECTION -> {
                 HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
                 Text(
                     text = field.label,
@@ -196,11 +236,12 @@ private fun FieldList(
                 Spacer(Modifier.height(Spacing.sm))
                 index += 1
             }
-            FormFieldType.TAB -> {
+            field.type == FormFieldType.TAB -> {
                 TabFieldList(
                     field = field,
                     data = data,
                     enabled = enabled,
+                    lookup = lookup,
                     onValueChange = onValueChange,
                     onAddRow = onAddRow,
                     onRemoveRow = onRemoveRow,
@@ -208,7 +249,7 @@ private fun FieldList(
                 )
                 index += 1
             }
-            FormFieldType.COL -> {
+            field.type == FormFieldType.COL -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     field.fields.forEach { child ->
                         Column(Modifier.weight(1f)) {
@@ -216,6 +257,7 @@ private fun FieldList(
                                 field = child,
                                 value = data[child.key],
                                 enabled = enabled,
+                                lookup = lookup,
                                 onValueChange = { onValueChange(child.key, it) },
                             )
                         }
@@ -224,11 +266,22 @@ private fun FieldList(
                 Spacer(Modifier.height(Spacing.md))
                 index += 1
             }
-            FormFieldType.TABLE, FormFieldType.TEXTAREA -> {
+            field.type == FormFieldType.HTML || field.type == FormFieldType.HIDDEN -> {
+                SingleField(
+                    field = field,
+                    value = data[field.key],
+                    enabled = enabled,
+                    lookup = lookup,
+                    onValueChange = { onValueChange(field.key, it) },
+                )
+                index += 1
+            }
+            field.type in fullWidthTypes -> {
                 TableOrTextarea(
                     field = field,
                     data = data,
                     enabled = enabled,
+                    lookup = lookup,
                     onValueChange = onValueChange,
                     onAddRow = onAddRow,
                     onRemoveRow = onRemoveRow,
@@ -239,11 +292,13 @@ private fun FieldList(
             else -> {
                 // Pair consecutive simple fields into a 2-column row.
                 val isSimple: (FormField) -> Boolean = {
-                    it.type != FormFieldType.SECTION &&
+                    it.type !in fullWidthTypes &&
+                        it.type !in hiddenTypes &&
+                        it.type != FormFieldType.SECTION &&
                         it.type != FormFieldType.TAB &&
                         it.type != FormFieldType.COL &&
-                        it.type != FormFieldType.TABLE &&
-                        it.type != FormFieldType.TEXTAREA
+                        it.type != FormFieldType.HTML &&
+                        it.type != FormFieldType.HIDDEN
                 }
                 val pair = buildList {
                     add(field)
@@ -260,6 +315,7 @@ private fun FieldList(
                                 field = f,
                                 data = data,
                                 enabled = enabled,
+                                lookup = lookup,
                                 onValueChange = onValueChange,
                                 onAddRow = onAddRow,
                                 onRemoveRow = onRemoveRow,
@@ -284,6 +340,7 @@ private fun TableOrTextarea(
     field: FormField,
     data: FormData,
     enabled: Boolean,
+    lookup: FormLookupRepository,
     onValueChange: (String, Any?) -> Unit,
     onAddRow: (FormField) -> Unit,
     onRemoveRow: (FormField, Int) -> Unit,
@@ -303,6 +360,7 @@ private fun TableOrTextarea(
                 field = field,
                 value = data[field.key],
                 enabled = enabled,
+                lookup = lookup,
                 onValueChange = { onValueChange(field.key, it) },
             )
             Spacer(Modifier.height(Spacing.md))
@@ -315,6 +373,7 @@ private fun TabFieldList(
     field: FormField,
     data: FormData,
     enabled: Boolean,
+    lookup: FormLookupRepository,
     onValueChange: (String, Any?) -> Unit,
     onAddRow: (FormField) -> Unit,
     onRemoveRow: (FormField, Int) -> Unit,
@@ -341,6 +400,7 @@ private fun TabFieldList(
             fields = active.fields,
             data = data,
             enabled = enabled,
+            lookup = lookup,
             onValueChange = onValueChange,
             onAddRow = onAddRow,
             onRemoveRow = onRemoveRow,
@@ -354,10 +414,11 @@ private fun SingleField(
     field: FormField,
     value: Any?,
     enabled: Boolean,
+    lookup: FormLookupRepository,
     onValueChange: (Any?) -> Unit,
 ) {
     when (field.type) {
-        FormFieldType.TEXT, FormFieldType.DATE, FormFieldType.DATETIME -> {
+        FormFieldType.TEXT -> {
             OutlinedTextField(
                 value = value?.toString() ?: "",
                 onValueChange = { onValueChange(it.ifEmpty { null }) },
@@ -371,6 +432,120 @@ private fun SingleField(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 ),
+            )
+        }
+        FormFieldType.DATE, FormFieldType.DATETIME -> {
+            DateField(
+                field = field,
+                value = value?.toString().orEmpty(),
+                withTime = field.type == FormFieldType.DATETIME,
+                enabled = enabled,
+                onValueChange = { onValueChange(it.ifEmpty { null }) },
+            )
+        }
+        FormFieldType.ANNOTATE -> {
+            AnnotateField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.HTML -> {
+            field.html?.takeIf { it.isNotBlank() }?.let { html ->
+                Text(
+                    text = html.replace(Regex("<[^>]*>"), "").trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        FormFieldType.HIDDEN -> Unit
+        FormFieldType.PATIENT, FormFieldType.AUTH_PATIENT -> {
+            PatientLookupField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.PRACTITIONER -> {
+            PractitionerLookupField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.DEPARTMENT -> {
+            DepartmentLookupField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.FILE -> {
+            FileField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.ITEM, FormFieldType.INVENTORY_ITEM -> {
+            MasterItemField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                kind = "STOCK_ITEM",
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.GENERIC_PRODUCT -> {
+            MasterItemField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                kind = "GENERIC_PRODUCT",
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.GENERIC_DRUG -> {
+            MasterItemField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                kind = "GENERIC_DRUG",
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.LOINC_TEST -> {
+            ConceptField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                concept = "LOINC",
+                onValueChange = onValueChange,
+            )
+        }
+        FormFieldType.DICOM_TEST -> {
+            ConceptField(
+                field = field,
+                value = value,
+                enabled = enabled,
+                lookup = lookup,
+                concept = "DICOM",
+                onValueChange = onValueChange,
             )
         }
         FormFieldType.TEXTAREA -> {
@@ -409,33 +584,12 @@ private fun SingleField(
             )
         }
         FormFieldType.SELECT -> {
-            Text(
-                text = field.label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SelectField(
+                field = field,
+                value = value?.toString(),
+                enabled = enabled,
+                onValueChange = onValueChange,
             )
-            if (field.options.isEmpty()) {
-                OutlinedTextField(
-                    value = value?.toString() ?: "",
-                    onValueChange = { onValueChange(it.ifEmpty { null }) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(field.label) },
-                    enabled = enabled,
-                    shape = RoundedCornerShape(Spacing.md),
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    field.options.forEach { option ->
-                        val selected = value?.toString() == option
-                        FilterChip(
-                            selected = selected,
-                            onClick = { onValueChange(if (!selected) option else null) },
-                            label = { Text(option.titleCase()) },
-                            enabled = enabled,
-                        )
-                    }
-                }
-            }
         }
         FormFieldType.RADIO -> {
             Text(
@@ -593,6 +747,177 @@ private fun TableField(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectField(
+    field: FormField,
+    value: String?,
+    enabled: Boolean,
+    onValueChange: (Any?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    if (field.options.isEmpty()) {
+        // No option list — fall back to free text.
+        OutlinedTextField(
+            value = value.orEmpty(),
+            onValueChange = { onValueChange(it.ifEmpty { null }) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(field.label) },
+            enabled = enabled,
+            shape = RoundedCornerShape(Spacing.md),
+        )
+        return
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = it },
+    ) {
+        OutlinedTextField(
+            value = value?.titleCase().orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            enabled = enabled,
+            label = { Text(field.label) },
+            placeholder = field.placeholder?.let { { Text(it) } },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            shape = RoundedCornerShape(Spacing.md),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("—") },
+                onClick = {
+                    onValueChange(null)
+                    expanded = false
+                },
+            )
+            field.options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.titleCase()) },
+                    onClick = {
+                        onValueChange(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Date (and optional time) picker field. Writes `yyyy-MM-dd` for DATE and
+ * `yyyy-MM-ddTHH:mm` for DATETIME — the formats the backend/validator expect.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(
+    field: FormField,
+    value: String,
+    withTime: Boolean,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+) {
+    var showDate by remember { mutableStateOf(false) }
+    var showTime by remember { mutableStateOf(false) }
+    var pendingDate by remember { mutableStateOf(value.substringBefore("T").takeIf { it.length == 10 }) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = value.substringBefore("T").toEpochMillisOrNull(),
+    )
+
+    OutlinedTextField(
+        value = value.replace('T', ' '),
+        onValueChange = {},
+        readOnly = true,
+        singleLine = true,
+        enabled = enabled,
+        label = { Text(field.label) },
+        placeholder = { Text(if (withTime) "yyyy-MM-dd HH:mm" else "yyyy-MM-dd") },
+        trailingIcon = {
+            IconButton(onClick = { if (enabled) showDate = true }) {
+                Icon(Icons.Filled.CalendarMonth, contentDescription = "Pick date")
+            }
+        },
+        shape = RoundedCornerShape(Spacing.md),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    if (showDate) {
+        DatePickerDialog(
+            onDismissRequest = { showDate = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val date = datePickerState.selectedDateMillis?.toLocalDateString()
+                        if (date == null) {
+                            showDate = false
+                        } else if (withTime) {
+                            pendingDate = date
+                            showDate = false
+                            showTime = true
+                        } else {
+                            onValueChange(date)
+                            showDate = false
+                        }
+                    },
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDate = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTime) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = value.substringAfter("T", "09:00").substringBefore(":").toIntOrNull() ?: 9,
+            initialMinute = value.substringAfter("T", "09:00").substringAfter(":", "00").take(2).toIntOrNull() ?: 0,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { showTime = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val hh = timePickerState.hour.toString().padStart(2, '0')
+                        val mm = timePickerState.minute.toString().padStart(2, '0')
+                        onValueChange("${pendingDate.orEmpty()}T$hh:$mm")
+                        showTime = false
+                    },
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTime = false }) { Text("Cancel") }
+            },
+            text = { TimePicker(state = timePickerState) },
+        )
+    }
+}
+
+private fun String.toEpochMillisOrNull(): Long? = runCatching {
+    LocalDate.parse(this).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}.getOrNull()
+
+private fun Long.toLocalDateString(): String =
+    Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate().toString()
+
 @Composable
 private fun LoadingBox(topPadding: Dp) {
     Column(
@@ -633,8 +958,32 @@ private fun ErrorBox(topPadding: Dp, message: String?, reload: (String) -> Unit,
 }
 
 @Composable
-private fun SubmittedBox(topPadding: Dp, submissionNumber: String?, onBack: () -> Unit) {
+private fun OfflineSubmittedBox(topPadding: Dp, onBack: () -> Unit) {
     Column(
+        modifier = Modifier.fillMaxSize().padding(top = topPadding).padding(Spacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Saved offline",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            text = "This document is stored on this device and will be submitted " +
+                "automatically when the connection returns.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.xl))
+        Button(onClick = onBack) { Text("Done") }
+    }
+}
+
+@Composable
+private fun SubmittedBox(topPadding: Dp, submissionNumber: String?, onBack: () -> Unit) {    Column(
         modifier = Modifier.fillMaxSize().padding(top = topPadding).padding(Spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

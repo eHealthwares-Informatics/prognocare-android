@@ -817,8 +817,8 @@ fun UserProfileScreen(
                             Spacer(modifier = Modifier.height(Spacing.md))
                             ServerConfigContent(
                                 config = appConfig,
-                                onSave = { emr, conv, channel, env ->
-                                    viewModel.saveServerConfig(emr, conv, channel, env)
+                                onSave = { emr, conv, concepts, rxsoft, channel, env ->
+                                    viewModel.saveServerConfig(emr, conv, concepts, rxsoft, channel, env)
                                 },
                                 onReset = { viewModel.resetServerConfig() },
                             )

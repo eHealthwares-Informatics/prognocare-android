@@ -45,7 +45,25 @@ object FormSchemaParser {
         rows = obj["rows"]?.jsonPrimitive?.intOrNull ?: 2,
         columns = obj["columns"]?.let { parseColumns(it) } ?: emptyList(),
         fields = obj["fields"]?.let { parseFields(it) } ?: emptyList(),
+        annotate = obj["annotate"]?.let { parseAnnotate(it) },
+        html = obj["html"]?.jsonPrimitive?.let { if (it.isString) it.content else null },
+        accept = obj["accept"]?.jsonPrimitive?.let { if (it.isString) it.content else null },
+        multiple = obj["multiple"]?.jsonPrimitive?.booleanOrNull ?: false,
+        maxSizeMb = obj["maxSizeMb"]?.jsonPrimitive?.intOrNull ?: 10,
     )
+
+    private fun parseAnnotate(element: JsonElement): AnnotateConfig? {
+        val obj = element as? JsonObject ?: return null
+        return AnnotateConfig(
+            target = AnnotateTarget.from(obj.optString("target")),
+            multiple = obj["multiple"]?.jsonPrimitive?.booleanOrNull ?: true,
+            regions = obj["regions"]?.let { stringList(it) } ?: emptyList(),
+            organ = obj["organ"]?.jsonPrimitive?.let { if (it.isString) it.content else null },
+            structures = obj["structures"]?.let { stringList(it) } ?: emptyList(),
+            views = obj["views"]?.let { stringList(it) } ?: emptyList(),
+            showLabels = obj["showLabels"]?.jsonPrimitive?.booleanOrNull ?: true,
+        )
+    }
 
     private fun parseColumns(element: JsonElement): List<FormTableColumn> =
         when (element) {

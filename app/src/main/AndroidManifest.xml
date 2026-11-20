@@ -2,7 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- App declares no advertising ID use: strip the permission merged in by dependencies. -->
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".PrognoCareApp"
@@ -16,6 +22,45 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PrognoCare"
         tools:targetApi="35">
+
+        <!-- Sentry (org: ehealthwares · project: ehealthwares_android) -->
+        <meta-data
+            android:name="io.sentry.dsn"
+            android:value="https://d6ca92ed94017be71e104c39a803946b@o4511611278000128.ingest.us.sentry.io/4512317521002496" />
+        <meta-data
+            android:name="io.sentry.data-collection.user-info"
+            android:value="false" />
+        <meta-data
+            android:name="io.sentry.traces.user-interaction.enable"
+            android:value="true" />
+        <meta-data
+            android:name="io.sentry.attach-screenshot"
+            android:value="true" />
+        <meta-data
+            android:name="io.sentry.attach-view-hierarchy"
+            android:value="true" />
+        <meta-data
+            android:name="io.sentry.traces.sample-rate"
+            android:value="1.0" />
+        <meta-data
+            android:name="io.sentry.traces.profiling.session-sample-rate"
+            android:value="1.0" />
+        <meta-data
+            android:name="io.sentry.traces.profiling.lifecycle"
+            android:value="trace" />
+        <meta-data
+            android:name="io.sentry.session-replay.on-error-sample-rate"
+            android:value="1.0" />
+        <meta-data
+            android:name="io.sentry.session-replay.session-sample-rate"
+            android:value="0.1" />
+        <meta-data
+            android:name="io.sentry.logs.enabled"
+            android:value="true" />
+        <meta-data
+            android:name="io.sentry.tombstone.enable"
+            android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

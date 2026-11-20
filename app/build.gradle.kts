@@ -12,26 +12,18 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.sentry.android)
 }
 android {
     namespace = "com.ehealthwares.prognocare"
     compileSdk = 36
 
-    signingConfigs {
-        create("release") {
-            storeFile.set(file(localProperties.getProperty("RELEASE_KEYSTORE_PATH") ?: ""))
-            storePassword.set(localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD") ?: "")
-            keyAlias.set(localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "release")
-            keyPassword.set(localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: "")
-        }
-    }
-
     defaultConfig {
         applicationId = "com.ehealthwares.prognocare"
         minSdk = 32
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "0.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -44,6 +36,16 @@ android {
             "String",
             "DEFAULT_CONVERSATION_URL",
             "\"${System.getenv("RXSOFT_CONVERSATION_URL") ?: "http://10.0.2.2:8090/api/"}\""
+        )
+        buildConfigField(
+            "String",
+            "DEFAULT_CONCEPTS_URL",
+            "\"${System.getenv("RXSOFT_CONCEPTS_URL") ?: "http://10.0.2.2:3011/api/v1/"}\""
+        )
+        buildConfigField(
+            "String",
+            "DEFAULT_RXSOFT_URL",
+            "\"${System.getenv("RXSOFT_BACKEND_URL") ?: "http://10.0.2.2:8080/api/"}\""
         )
         buildConfigField(
             "String",
@@ -87,12 +89,26 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Release builds ship pointing at production; the 10.0.2.2 defaults
+            // in defaultConfig are only for debug builds.
+            buildConfigField("String", "DEFAULT_EMR_URL", "\"https://api.ehealthwares.com/emr/\"")
+            buildConfigField("String", "DEFAULT_CONVERSATION_URL", "\"https://api.ehealthwares.com/conversation/\"")
+            buildConfigField("String", "DEFAULT_CONCEPTS_URL", "\"https://api.ehealthwares.com/concepts/v1/\"")
+            buildConfigField("String", "DEFAULT_RXSOFT_URL", "\"https://api.ehealthwares.com/\"")
         }
     }
 
-    buildTypes.named("release") {
-        it.signingConfig.set(signingConfigs.getByName("release"))
+    // Name the built APK with app-specific prefix, e.g. prognocare-release-1.0.3.apk
+    applicationVariants.all {
+        val variantName = name
+        val vName = versionName
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val ext = output.outputFile?.extension?.ifBlank { "apk" } ?: "apk"
+            output.outputFileName = "prognocare-$variantName-$vName.$ext"
+        }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -105,6 +121,14 @@ android {
         buildConfig = true
     }
 }
+
+// ── Release signing (configured after android block for Kotlin DSL compatibility) ──
+val releaseSigningConfig = android.signingConfigs.create("release")
+releaseSigningConfig.setStoreFile(file(localProperties.getProperty("RELEASE_KEYSTORE_PATH") ?: ""))
+releaseSigningConfig.setStorePassword(localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD") ?: "")
+releaseSigningConfig.setKeyAlias(localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "release")
+releaseSigningConfig.setKeyPassword(localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: "")
+android.buildTypes.getByName("release").setSigningConfig(releaseSigningConfig)
 
 dependencies {
     // Core
@@ -140,6 +164,9 @@ dependencies {
 
     // DataStore
     implementation(libs.datastore.preferences)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // Network
     implementation(libs.retrofit)
@@ -153,6 +180,8 @@ dependencies {
 
     // Socket.IO
     implementation(libs.socketio.client)
+    // Sentry
+    implementation(libs.sentry.android)
 
     // Social sign-in (Google Credential Manager + Facebook Login)
     implementation(libs.androidx.credentials)
@@ -165,4 +194,16 @@ dependencies {
     testImplementation(libs.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+// ── Sentry (org/project shared by the ehealthwares Android apps) ──
+// Must live in the app module: the plugin ignores the configuration when it is
+// declared on the root project ("only supported for the app module" warning),
+// which made release builds fail with "A project ID or slug is required".
+sentry {
+    org.set("ehealthwares")
+    projectName.set("ehealthwares_android")
+
+    // Upload sources so stack traces show code in Sentry.
+    includeSourceContext.set(true)
 }
